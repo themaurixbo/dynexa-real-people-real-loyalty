@@ -8,7 +8,7 @@ That is why we are building DYNEXA: to make rewards easy to receive, impossible 
 
 DYNEXA is being built in Latin America, but this is a problem shared by people everywhere.
 
-# dynexa-real-people-real-loyalty
+# Dynexa Real People, Real Loyalty
 An AI-powered loyalty platform that enables businesses to deliver USDC and branded rewards to verified customers through secure, policy-controlled wallets.
 
 ## DYNEXA: Real Loyalty for Real People
