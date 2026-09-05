@@ -1,4 +1,4 @@
-## OUR MOTIVAITON AS LATINS ;)
+## OUR MOTIVATION AS LATINS ;)
 
 We are excited to be here at ETHOnline 2026 because we believe our idea/ project  has what it takes to stand among the hackathon’s best. We are solving a problem that may seem simple, but is deeply frustrating and familiar to millions of people across Latin America.
 
