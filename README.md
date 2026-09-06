@@ -29,8 +29,9 @@ Finally, we will test the complete journey, including duplicate claims, excessiv
 
 ## Status
 
-Day 1. Compliance and planning docs in place, integration spikes done. Next: DB
-schema and the campaign treasury contracts on Arc testnet.
+Day 1. Compliance and planning docs, integration spikes, DB schema (Drizzle) and
+the campaign treasury contracts + tests are in. Next: deploy the contracts to Arc
+testnet and wire the Privy business/consumer wallets.
 
 ## Docs
 
