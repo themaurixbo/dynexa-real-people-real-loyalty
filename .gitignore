@@ -1,0 +1,25 @@
+node_modules/
+.pnp.*
+.yarn/*
+
+# env
+.env
+.env.local
+.env.*.local
+
+# builds
+dist/
+build/
+.next/
+out/
+
+# foundry
+packages/contracts/out/
+packages/contracts/cache/
+packages/contracts/broadcast/
+
+# misc
+.DS_Store
+*.log
+coverage/
+.turbo/
