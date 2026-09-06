@@ -27,4 +27,23 @@ Next, we will add the branded GiftToken, the POS redemption flow and the busines
 
 Finally, we will test the complete journey, including duplicate claims, excessive payments and repeated redemptions. Our demo will focus on one clear flow: a business funds a campaign, a verified customer completes a purchase, the AI approves the reward and DYNEXA delivers real value while keeping the business in control.
 
+## Status
+
+Day 1. Compliance and planning docs in place, integration spikes done. Next: DB
+schema and the campaign treasury contracts on Arc testnet.
+
+## Docs
+
+- [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) — working plan and cut order
+- [SPIKES.md](SPIKES.md) — Arc / Privy / World research and open blockers
+- [PREEXISTING_WORK.md](PREEXISTING_WORK.md) — greenfield compliance disclosure
+- [docs/adr/0001-stack-and-structure.md](docs/adr/0001-stack-and-structure.md) — stack decisions
+
+## Stack
+
+TypeScript monorepo (pnpm). Next.js + Tailwind web, Node API, PostgreSQL +
+Drizzle, Foundry contracts, viem. See the ADR for details.
+
+Copy `.env.example` to `.env` before running anything.
+
 
