@@ -1,0 +1,12 @@
+{
+  "name": "dynexa",
+  "private": true,
+  "packageManager": "pnpm@10.4.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "contracts:build": "pnpm --filter @dynexa/contracts build",
+    "contracts:test": "pnpm --filter @dynexa/contracts test"
+  }
+}
