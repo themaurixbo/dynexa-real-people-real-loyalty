@@ -18,20 +18,34 @@ local `.env` (never commit it).
    actions. Privy keeps the public key; the private key goes to
    `PRIVY_AUTHORIZATION_KEY`. This key is what signs the agent payout and what
    the spending **policy** is attached to (per-tx cap = 5 USDC → our Use Case 6).
-6. Arc is added in code (`packages/config/src/arc.ts`), not the dashboard. If the
-   dashboard asks to allowlist an RPC, use chain id `5042002` /
-   `https://rpc.testnet.arc.network`.
+6. Arc: add it as a custom chain in **Configuration → Chains** (id `5042002`,
+   RPC `https://rpc.testnet.arc.network`, symbol `USDC`, explorer
+   `https://testnet.arcscan.app`) so Privy allows wallet actions on it. The app
+   side also defines it in `packages/config/src/arc.ts`.
+
+## Arc
+
+Nothing to sign up for — Arc is a testnet chain. The only manual step is funding
+the deployer wallet with testnet USDC from https://faucet.circle.com (USDC is the
+gas token). The chain config already lives in `packages/config/src/arc.ts`.
 
 ## 2. World
 
+Only the **World ID verification** flow is needed — not a published Mini App.
+The "Availability / Localised content / Showcase images / Review" wizard is the
+Mini App store listing; skip it.
+
 1. Sign in at https://developer.world.org.
-2. Create an app — `DYNEXA`. Copy the **app_id** → `WORLD_APP_ID`.
-3. Create an **action**: id `verify-human-welcome`. Keep it in **staging** for
-   now (staging works with the World ID Simulator; production needs real
+2. Create an app — `DYNEXA`. Copy the **App ID** → `WORLD_APP_ID`.
+3. **World ID Configuration**: note the **RP ID** (`WORLD_RP_ID`) and the
+   **RP signing key private key** (`WORLD_RP_SIGNING_KEY`) — shown once, backend
+   secret, never sent to the client. If World asked for a signer *address*
+   instead, that address' key is what signs RP requests (`WORLD_SIGNER_ADDRESS`).
+4. Create an **Incognito Action**: id `verify-human-welcome`, environment
+   **staging** (works with the World ID Simulator; production needs real
    devices). → `WORLD_ACTION_ID`, `WORLD_ENVIRONMENT=staging`.
-4. In the app's sign-in / API section, note the **rp_id** (`WORLD_RP_ID`) and
-   generate the **RP signing key** (`WORLD_RP_SIGNING_KEY`) — backend secret,
-   never sent to the client.
+5. The Developer Portal **API key** (`WORLD_API_KEY`) is for the portal's
+   management API, separate from the RP signing key. Still a secret.
 5. **Selfie Check** is Beta and gated by a per-app feature flag. Check whether
    the Selfie Check credential is available for the app. If not, request access
    through the hackathon's World contact / sponsor channel.
