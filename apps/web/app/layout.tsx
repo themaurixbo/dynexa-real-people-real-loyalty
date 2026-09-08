@@ -7,14 +7,30 @@ export const metadata: Metadata = {
   description: "Real rewards for real, human-verified people.",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <body>
+        <div
+          className="glow"
+          style={{
+            top: -160,
+            right: -120,
+            width: 480,
+            height: 480,
+            background: "radial-gradient(circle, rgba(209,140,255,0.24), transparent 70%)",
+          }}
+        />
+        <div
+          className="glow"
+          style={{
+            bottom: -180,
+            left: -120,
+            width: 460,
+            height: 460,
+            background: "radial-gradient(circle, rgba(255,47,224,0.18), transparent 70%)",
+          }}
+        />
         <Providers>{children}</Providers>
       </body>
     </html>
