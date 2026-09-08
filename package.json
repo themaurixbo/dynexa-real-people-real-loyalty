@@ -7,6 +7,10 @@
   },
   "scripts": {
     "contracts:build": "pnpm --filter @dynexa/contracts build",
-    "contracts:test": "pnpm --filter @dynexa/contracts test"
+    "contracts:test": "pnpm --filter @dynexa/contracts test",
+    "web:dev": "pnpm --filter @dynexa/web dev"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["@tailwindcss/oxide", "sharp", "esbuild"]
   }
 }
