@@ -21,6 +21,8 @@ export const env = {
   arcUsdc: (process.env.ARC_USDC_ADDRESS ??
     "0x3600000000000000000000000000000000000000") as `0x${string}`,
   factoryAddress: process.env.FACTORY_ADDRESS as `0x${string}` | undefined,
+  giftTokenAddress: process.env.GIFT_TOKEN_ADDRESS as `0x${string}` | undefined,
+  verifierWallet: (process.env.VERIFIER_WALLET_ADDRESS ?? "") as `0x${string}`,
   // The business key: creates campaigns, funds treasuries. Day 3 -> Privy wallet.
   businessKey: req("DEPLOYER_PRIVATE_KEY") as `0x${string}`,
   // The agent that signs payouts. "circle" = Circle Agent Wallet via CLI,

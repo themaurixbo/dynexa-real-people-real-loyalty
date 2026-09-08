@@ -1,7 +1,8 @@
 import { and, count, eq, inArray } from "drizzle-orm";
-import { keccak256, toHex } from "viem";
+import { decodeEventLog, keccak256, toHex } from "viem";
 import { db, schema } from "../db/client.js";
-import { fromUsdc, treasuryBalance, usdc } from "../lib/chain.js";
+import { env } from "../lib/env.js";
+import { fromUsdc, giftTokenAbi, publicClient, treasuryBalance, usdc } from "../lib/chain.js";
 import { evaluatePolicy } from "./policy.js";
 import { agentSigner } from "./signer.js";
 import { checkEvidence } from "./verifier.js";
@@ -16,6 +17,7 @@ const {
   aiDecisions,
   policyResults,
   payouts,
+  giftTokenIssuances,
   blockchainTransactions,
   auditEvents,
 } = schema;
@@ -35,6 +37,7 @@ export interface ClaimResult {
   reason: string;
   reasonCodes: string[];
   amountUsdc?: string;
+  giftTokenId?: number | null;
   txHash?: string;
 }
 
@@ -69,10 +72,14 @@ export async function runRewardClaim(reqBody: ClaimRequest): Promise<ClaimResult
   });
 
   const amount = usdc(campaign.rewardPerUserUsdc ?? "0");
-  const balance = await treasuryBalance(campaign.treasuryAddress as `0x${string}`);
+  const balance =
+    campaign.rewardMode === "usdc"
+      ? await treasuryBalance(campaign.treasuryAddress as `0x${string}`)
+      : 0n;
   const now = new Date();
 
   const policy = evaluatePolicy({
+    rewardMode: campaign.rewardMode,
     campaignActive: campaign.status === "active",
     withinDates:
       (!campaign.startsAt || campaign.startsAt <= now) &&
@@ -115,15 +122,21 @@ export async function runRewardClaim(reqBody: ClaimRequest): Promise<ClaimResult
 
   await db.insert(aiDecisions).values({
     claimId: claim.id,
-    model: "verifier-stub-v0",
-    promptVersion: "v0",
-    provider: "stub",
+    model: verdict.model,
+    promptVersion: "v1",
+    provider: verdict.model.startsWith("gpt") ? "openai" : "rule",
     input: { qualifyCondition: campaign.qualifyCondition, receiptRef: reqBody.receiptRef },
     output: verdict,
     eligible: verdict.valid,
     reasonCodes,
     humanExplanation: verdict.reason,
   });
+  if (verdict.paymentTx) {
+    await audit("agent", "verifier.paid", "claim", claim.id, {
+      to: "verifier-agent",
+      txHash: verdict.paymentTx,
+    });
+  }
   await db.insert(policyResults).values({
     claimId: claim.id,
     passed: policy.outcome === "pass",
@@ -148,11 +161,20 @@ export async function runRewardClaim(reqBody: ClaimRequest): Promise<ClaimResult
     };
   }
 
-  // --- pass: the agent signs and pays ---
-  const paid = await payAndRecord(claim.id, campaign, user, {
-    nullifierHash,
-    receiptHash,
-  });
+  // --- pass: the agent pays the reward ---
+  if (campaign.rewardMode === "gift") {
+    const minted = await mintGiftAndRecord(claim.id, campaign, user, { nullifierHash, receiptHash });
+    return {
+      claimId: claim.id,
+      status: "paid",
+      reason: verdict.reason,
+      reasonCodes,
+      giftTokenId: minted.tokenId,
+      txHash: minted.txHash,
+    };
+  }
+
+  const paid = await payAndRecord(claim.id, campaign, user, { nullifierHash, receiptHash });
   return {
     claimId: claim.id,
     status: "paid",
@@ -212,6 +234,85 @@ export async function payAndRecord(
   await audit("agent", "claim.paid", "claim", claimId, { txHash });
 
   return { txHash };
+}
+
+/** Gift campaigns: the agent mints a GiftToken instead of sending USDC. */
+export async function mintGiftAndRecord(
+  claimId: string,
+  campaign: typeof schema.campaigns.$inferSelect,
+  user: typeof schema.users.$inferSelect,
+  refs: { nullifierHash: `0x${string}`; receiptHash: `0x${string}` },
+) {
+  if (!env.giftTokenAddress) throw new Error("GIFT_TOKEN_ADDRESS not set");
+  if (!campaign.giftTokenId) throw new Error("campaign has no registered gift");
+
+  const [wallet] = await db
+    .select()
+    .from(wallets)
+    .where(and(eq(wallets.ownerId, user.id), eq(wallets.ownerType, "user")));
+  if (!wallet) throw new Error("user has no wallet");
+
+  const onchainClaimId = keccak256(toHex(claimId));
+  const { txHash } = await agentSigner.mintGift(
+    env.giftTokenAddress,
+    wallet.address as `0x${string}`,
+    BigInt(campaign.giftTokenId),
+    onchainClaimId,
+  );
+
+  const tokenId = await tokenIdFromReceipt(txHash);
+
+  const [tx] = await db
+    .insert(blockchainTransactions)
+    .values({
+      chainId: 5042002,
+      hash: txHash,
+      kind: "mint",
+      status: "confirmed",
+      toAddress: wallet.address,
+      confirmedAt: new Date(),
+    })
+    .returning();
+
+  const code = `GIFT-${randomCode()}`;
+  await db.insert(giftTokenIssuances).values({
+    claimId,
+    campaignId: campaign.id,
+    tokenId: tokenId ?? 0,
+    toAddress: wallet.address,
+    redemptionCode: code,
+    txId: tx.id,
+    status: "minted",
+  });
+  await db
+    .update(claims)
+    .set({ status: "paid", onchainClaimId, giftTokenId: tokenId ?? null, decidedAt: new Date() })
+    .where(eq(claims.id, claimId));
+  await audit("agent", "claim.gift_minted", "claim", claimId, { txHash, tokenId, code });
+
+  return { txHash, tokenId, code };
+}
+
+async function tokenIdFromReceipt(txHash: string): Promise<number | null> {
+  if (!txHash.startsWith("0x")) return null;
+  try {
+    const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+    for (const log of receipt.logs) {
+      try {
+        const parsed = decodeEventLog({ abi: giftTokenAbi, data: log.data, topics: log.topics });
+        if (parsed.eventName === "GiftMinted") return Number((parsed.args as { tokenId: bigint }).tokenId);
+      } catch {
+        // not our event
+      }
+    }
+  } catch {
+    // receipt not available (e.g. Circle returned a tx id)
+  }
+  return null;
+}
+
+function randomCode(): string {
+  return Math.random().toString(36).slice(2, 6).toUpperCase() + "-" + Math.random().toString(36).slice(2, 6).toUpperCase();
 }
 
 async function findOrCreateUser(contact: string, addr?: `0x${string}`) {

@@ -4,6 +4,7 @@
  */
 
 export interface PolicyInput {
+  rewardMode: "usdc" | "gift";
   campaignActive: boolean;
   withinDates: boolean;
   evidenceValid: boolean;
@@ -35,9 +36,11 @@ export function evaluatePolicy(i: PolicyInput): PolicyDecision {
     { code: "EVIDENCE_VALID", ok: i.evidenceValid },
     { code: "RECEIPT_NOT_REUSED", ok: !i.receiptAlreadyUsed },
     { code: "UNDER_PER_HUMAN_LIMIT", ok: i.priorClaimsByHuman < i.maxUsesPerHuman },
-    { code: "UNDER_PER_TX_LIMIT", ok: i.amount <= i.maxPerTx },
-    { code: "TREASURY_FUNDED", ok: i.treasuryBalance >= i.amount },
   ];
+  if (i.rewardMode === "usdc") {
+    checks.push({ code: "UNDER_PER_TX_LIMIT", ok: i.amount <= i.maxPerTx });
+    checks.push({ code: "TREASURY_FUNDED", ok: i.treasuryBalance >= i.amount });
+  }
 
   const failed = checks.find((c) => !c.ok);
   if (failed) return { outcome: "reject", reason: reasonFor(failed.code), checks };

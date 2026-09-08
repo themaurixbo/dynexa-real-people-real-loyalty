@@ -2,6 +2,8 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import {
   businessAccount,
+  GIFT_MINT_SIG,
+  giftTokenAbi,
   PAYOUT_SIG,
   publicClient,
   treasuryAbi,
@@ -28,6 +30,12 @@ export interface RewardAuthorization {
 export interface AgentSigner {
   address: `0x${string}`;
   payout(treasury: `0x${string}`, auth: RewardAuthorization): Promise<{ txHash: string }>;
+  mintGift(
+    giftToken: `0x${string}`,
+    to: `0x${string}`,
+    giftCampaignId: bigint,
+    claimId: `0x${string}`,
+  ): Promise<{ txHash: string }>;
 }
 
 class CircleAgentSigner implements AgentSigner {
@@ -53,11 +61,40 @@ class CircleAgentSigner implements AgentSigner {
       "--output",
       "json",
     ]);
-    const res = JSON.parse(stdout);
-    const txHash =
-      res?.data?.txHash ?? res?.data?.transactionHash ?? res?.data?.transactionId ?? "pending";
-    return { txHash };
+    return { txHash: parseTxHash(stdout) };
   }
+
+  async mintGift(
+    giftToken: `0x${string}`,
+    to: `0x${string}`,
+    giftCampaignId: bigint,
+    claimId: `0x${string}`,
+  ) {
+    const { stdout } = await run("circle", [
+      "wallet",
+      "execute",
+      GIFT_MINT_SIG,
+      to,
+      giftCampaignId.toString(),
+      claimId,
+      "--contract",
+      giftToken,
+      "--address",
+      this.address,
+      "--chain",
+      env.circleChain,
+      "--output",
+      "json",
+    ]);
+    return { txHash: parseTxHash(stdout) };
+  }
+}
+
+function parseTxHash(stdout: string): string {
+  const res = JSON.parse(stdout);
+  return (
+    res?.data?.txHash ?? res?.data?.transactionHash ?? res?.data?.transactionId ?? "pending"
+  );
 }
 
 class LocalKeySigner implements AgentSigner {
@@ -69,6 +106,22 @@ class LocalKeySigner implements AgentSigner {
       abi: treasuryAbi,
       functionName: "payout",
       args: [a.claimId, a.customer, a.nullifierHash, a.receiptHash, a.amount],
+    });
+    await publicClient.waitForTransactionReceipt({ hash: txHash });
+    return { txHash };
+  }
+
+  async mintGift(
+    giftToken: `0x${string}`,
+    to: `0x${string}`,
+    giftCampaignId: bigint,
+    claimId: `0x${string}`,
+  ) {
+    const txHash = await walletClient.writeContract({
+      address: giftToken,
+      abi: giftTokenAbi,
+      functionName: "mint",
+      args: [to, giftCampaignId, claimId],
     });
     await publicClient.waitForTransactionReceipt({ hash: txHash });
     return { txHash };

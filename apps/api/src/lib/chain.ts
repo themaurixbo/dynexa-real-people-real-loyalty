@@ -71,6 +71,88 @@ export const treasuryAbi = [
   { type: "function", name: "claimUsed", stateMutability: "view", inputs: [{ type: "bytes32" }], outputs: [{ type: "bool" }] },
 ] as const;
 
+export const GIFT_MINT_SIG = "mint(address,uint256,bytes32)" as const;
+export const GIFT_REDEEM_SIG = "redeem(uint256,address)" as const;
+
+export const giftTokenAbi = [
+  {
+    type: "function",
+    name: "registerGiftCampaign",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "metadataUri", type: "string" },
+      { name: "expiry", type: "uint64" },
+      { name: "transferable", type: "bool" },
+      { name: "redeemer", type: "address" },
+    ],
+    outputs: [{ name: "campaignId", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "mint",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "campaignId", type: "uint256" },
+      { name: "claimId", type: "bytes32" },
+    ],
+    outputs: [{ name: "tokenId", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "redeem",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "tokenId", type: "uint256" },
+      { name: "holder", type: "address" },
+    ],
+    outputs: [],
+  },
+  { type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ name: "a", type: "address" }, { name: "id", type: "uint256" }], outputs: [{ type: "uint256" }] },
+  { type: "function", name: "redeemed", stateMutability: "view", inputs: [{ type: "uint256" }], outputs: [{ type: "bool" }] },
+  {
+    type: "event",
+    name: "GiftMinted",
+    inputs: [
+      { name: "tokenId", type: "uint256", indexed: true },
+      { name: "campaignId", type: "uint256", indexed: true },
+      { name: "to", type: "address", indexed: true },
+      { name: "claimId", type: "bytes32", indexed: false },
+    ],
+  },
+] as const;
+
+/** Business action: register a gift campaign on the GiftToken contract. */
+export async function registerGiftCampaign(p: {
+  giftToken: `0x${string}`;
+  metadataUri: string;
+  expiry: bigint;
+  transferable: boolean;
+  redeemer: `0x${string}`;
+}) {
+  const { request, result } = await publicClient.simulateContract({
+    address: p.giftToken,
+    abi: giftTokenAbi,
+    functionName: "registerGiftCampaign",
+    args: [p.metadataUri, p.expiry, p.transferable, p.redeemer],
+    account: businessAccount,
+  });
+  const txHash = await send(walletClient.writeContract(request));
+  return { giftCampaignId: result as bigint, txHash };
+}
+
+/** Business (redeemer) action: redeem a gift at the point of sale. */
+export async function redeemGift(giftToken: `0x${string}`, tokenId: bigint, holder: `0x${string}`) {
+  return send(
+    walletClient.writeContract({
+      address: giftToken,
+      abi: giftTokenAbi,
+      functionName: "redeem",
+      args: [tokenId, holder],
+    }),
+  );
+}
+
 export const erc20Abi = [
   { type: "function", name: "approve", stateMutability: "nonpayable", inputs: [{ name: "s", type: "address" }, { name: "a", type: "uint256" }], outputs: [{ type: "bool" }] },
   { type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ name: "a", type: "address" }], outputs: [{ type: "uint256" }] },

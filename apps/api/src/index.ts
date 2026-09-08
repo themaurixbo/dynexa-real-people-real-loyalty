@@ -4,6 +4,7 @@ import { env } from "./lib/env.js";
 import { agentSigner } from "./agent/signer.js";
 import { campaignRoutes } from "./routes/campaigns.js";
 import { claimRoutes } from "./routes/claims.js";
+import { redeemRoutes } from "./routes/redeem.js";
 
 const app = Fastify({ logger: true });
 
@@ -18,6 +19,7 @@ app.get("/health", async () => ({
 
 await app.register(campaignRoutes);
 await app.register(claimRoutes);
+await app.register(redeemRoutes);
 
 app
   .listen({ port: env.port, host: "0.0.0.0" })

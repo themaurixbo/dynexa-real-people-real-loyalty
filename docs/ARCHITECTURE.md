@@ -10,8 +10,8 @@ decision; it never chooses the amount and never holds an unbounded wallet.
 |---|---|---|
 | Consumer | Privy embedded wallet (email/phone login, no seed phrase) | receives the reward |
 | Business | Privy wallet with a spending policy | funds the campaign treasury, approves large payouts |
-| Reward agent | Circle Agent Wallet (spending limit + allowlist + blocklist) | signs and sends the payout, autonomously |
-| Verifier agent | Circle Agent Wallet | checks the evidence; paid per check |
+| Reward agent | Circle Agent Wallet `0x7b17…4164` | sends the USDC payout / mints the gift, autonomously |
+| Verifier agent | Circle Agent Wallet `0x7fa4…49f4` | checks the evidence; paid 0.001 USDC per check by the reward agent |
 
 ## Reward flow
 

@@ -3,10 +3,12 @@ import { desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "../db/client.js";
 import {
+  businessAccount,
   closeTreasury,
   createCampaignOnChain,
   fromUsdc,
   fundTreasury,
+  registerGiftCampaign,
   setTreasuryPaused,
   treasuryBalance,
   usdc,
@@ -29,6 +31,10 @@ const createBody = z.object({
   qualifyCondition: z.string().default(""),
   startsAt: z.string().datetime().optional(),
   endsAt: z.string().datetime().optional(),
+  // gift-mode only
+  giftName: z.string().default("Free gift"),
+  giftMetadataUri: z.string().default(""),
+  giftTransferable: z.boolean().default(false),
 });
 
 export async function campaignRoutes(app: FastifyInstance) {
@@ -38,12 +44,29 @@ export async function campaignRoutes(app: FastifyInstance) {
 
     const business = await upsertBusiness(body.businessName);
 
+    // Always deploy a treasury (holds USDC for usdc campaigns; unused for gift).
     const { treasury, txHash } = await createCampaignOnChain({
       factory: env.factoryAddress,
       agent: agentSigner.address,
       perTxLimit: usdc(body.maxPerTxUsdc),
       campaignTotalLimit: usdc(body.totalBudgetUsdc),
     });
+
+    let giftCampaignId: number | null = null;
+    let giftTxHash: string | undefined;
+    if (body.rewardMode === "gift") {
+      if (!env.giftTokenAddress) return reply.code(500).send({ error: "GIFT_TOKEN_ADDRESS not set" });
+      const expiry = body.endsAt ? BigInt(Math.floor(new Date(body.endsAt).getTime() / 1000)) : 0n;
+      const r = await registerGiftCampaign({
+        giftToken: env.giftTokenAddress,
+        metadataUri: body.giftMetadataUri || body.giftName,
+        expiry,
+        transferable: body.giftTransferable,
+        redeemer: businessAccount.address,
+      });
+      giftCampaignId = Number(r.giftCampaignId);
+      giftTxHash = r.txHash;
+    }
 
     const [campaign] = await db
       .insert(campaigns)
@@ -59,6 +82,7 @@ export async function campaignRoutes(app: FastifyInstance) {
         rewardPerUserUsdc: body.rewardPerUserUsdc,
         maxPerTxUsdc: body.maxPerTxUsdc,
         maxUsesPerHuman: body.maxUsesPerHuman,
+        giftTokenId: giftCampaignId,
         requiresApprovalAboveUsdc: body.requiresApprovalAboveUsdc ?? null,
         qualifyCondition: body.qualifyCondition,
         startsAt: body.startsAt ? new Date(body.startsAt) : null,
@@ -66,7 +90,7 @@ export async function campaignRoutes(app: FastifyInstance) {
       })
       .returning();
 
-    return { campaign, treasury, txHash };
+    return { campaign, treasury, txHash, giftCampaignId, giftTxHash };
   });
 
   app.get("/campaigns", async () => {
