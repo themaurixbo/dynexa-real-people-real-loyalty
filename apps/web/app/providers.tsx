@@ -15,7 +15,9 @@ const arcTestnet = defineChain({
 });
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? "";
+  // Public identifier; env var overrides for other environments.
+  const appId =
+    process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? "cmtru42ak00bs0cjmrspktdoy";
 
   return (
     <PrivyProvider
