@@ -29,9 +29,10 @@ Finally, we will test the complete journey, including duplicate claims, excessiv
 
 ## Status
 
-Day 1. Compliance and planning docs, integration spikes, DB schema (Drizzle) and
-the campaign treasury contracts + tests are in. Next: deploy the contracts to Arc
-testnet and wire the Privy business/consumer wallets.
+`CampaignTreasuryFactory` is live on Arc testnet and a campaign has been created,
+funded and paid out with real USDC — see [docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md).
+DB schema and contract tests are in. Next: Privy business/consumer wallets and the
+World verification flow.
 
 ## Docs
 

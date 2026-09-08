@@ -18,15 +18,24 @@ forge test
 
 `lib/` (forge-std, openzeppelin-contracts v5.1.0) is vendored in the repo.
 
-## Deploy to Arc testnet
+## Arc testnet
 
-Needs `DEPLOYER_PRIVATE_KEY` and `ARC_RPC_URL` in the environment. The deployer
-wallet needs USDC on Arc for gas (faucet: https://faucet.circle.com).
+Needs `DEPLOYER_PRIVATE_KEY` and `ARC_RPC_URL`. The deployer wallet needs USDC on
+Arc for gas (faucet: https://faucet.circle.com). Deployed addresses are in
+`docs/DEPLOYMENTS.md`.
+
+Deploy the factory:
 
 ```
 forge script script/DeployFactory.s.sol --rpc-url "$ARC_RPC_URL" --broadcast
 ```
 
-On Arc, USDC is the native gas token at `0x3600000000000000000000000000000000000000`
-and is passed as the `usdc` address when creating a campaign. See `SPIKES.md` for
-the open question about the native-vs-ERC20 interface.
+`forge` can't simulate Arc's native USDC precompile locally, so anything that
+touches USDC on a live network goes through `cast send` or the viem script:
+
+```
+pnpm payout <treasury> <customer> <amount6>       # signed RewardAuthorization
+```
+
+USDC (`0x3600…`) is passed as the `usdc` address when creating a campaign and
+works through the standard ERC-20 interface.

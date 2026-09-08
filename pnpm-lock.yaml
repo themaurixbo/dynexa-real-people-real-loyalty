@@ -27,7 +27,11 @@ importers:
         specifier: 2.56.3
         version: 2.56.3
 
-  packages/contracts: {}
+  packages/contracts:
+    devDependencies:
+      viem:
+        specifier: 2.56.3
+        version: 2.56.3
 
 packages:
 

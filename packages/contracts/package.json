@@ -5,6 +5,10 @@
   "scripts": {
     "build": "forge build",
     "test": "forge test",
-    "fmt": "forge fmt"
+    "fmt": "forge fmt",
+    "payout": "node script/payout.mjs"
+  },
+  "devDependencies": {
+    "viem": "2.56.3"
   }
 }

@@ -19,9 +19,10 @@ Important: on Arc, USDC is the native gas token at a system address. It behaves 
 an ERC-20 (6 decimals) and as native value (18 decimals) at the same time.
 
 Implications for our contracts:
-- `CampaignTreasury` holds and pays USDC. Decide whether it takes USDC through
-  the ERC-20 interface at `0x3600…` or as native value. **Needs hands-on** on
-  testnet before finalizing the contract.
+- `CampaignTreasury` takes USDC through the standard ERC-20 interface at
+  `0x3600…` — confirmed on testnet (`approve` + `transferFrom` work). See
+  `docs/DEPLOYMENTS.md`. Note: `forge script` can't simulate the native USDC
+  precompile locally, so live scripts use `cast send` / viem.
 - Every wallet that sends a tx (business, agent signer) needs USDC for gas, not a
   separate token. The faucet covers this.
 - MockUSDC stays for local Foundry tests only.
@@ -70,7 +71,6 @@ Source: World developer docs (`docs.world.org/world-id`).
 
 1. **World Selfie Check feature flag** — confirm it is on for our app, or request
    it. Have the Incognito Actions fallback ready.
-2. **Arc USDC as native gas** — decide the treasury's USDC interface with a small
-   test deploy before building the full contract.
-3. Account setup still pending: Privy app, World Developer Portal app + staging
-   action, LLM API key.
+2. ~~Arc USDC interface~~ — resolved, standard ERC-20 (see above).
+3. Account setup: Privy app done, World app done. Still pending: World staging
+   action, Privy server-wallet authorization key, LLM key rotation.
