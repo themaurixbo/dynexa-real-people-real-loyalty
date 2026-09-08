@@ -29,10 +29,11 @@ Finally, we will test the complete journey, including duplicate claims, excessiv
 
 ## Status
 
-`CampaignTreasuryFactory` is live on Arc testnet and a campaign has been created,
-funded and paid out with real USDC — see [docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md).
-DB schema and contract tests are in. Next: Privy business/consumer wallets and the
-World verification flow.
+The autonomous agent flow works end to end on Arc testnet: a claim comes in, the
+policy engine checks it against the live campaign, and a **Circle Agent Wallet
+executes the USDC payout** — see [docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md).
+Backend (`apps/api`), contracts and the DB schema are in. Next: Privy
+business/consumer wallets, the GiftToken contract, and World Selfie Check.
 
 ## Docs
 

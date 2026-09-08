@@ -32,6 +32,7 @@ export const campaignStatus = pgEnum("campaign_status", [
   "closed",
 ]);
 export const rewardType = pgEnum("reward_type", ["receipt", "selfie", "referral"]);
+export const rewardMode = pgEnum("reward_mode", ["usdc", "gift"]);
 export const claimStatus = pgEnum("claim_status", [
   "pending",
   "approved",
@@ -102,13 +103,16 @@ export const campaigns = pgTable("campaigns", {
   description: text("description"),
   status: campaignStatus("status").notNull().default("draft"),
   rewardType: rewardType("reward_type").notNull().default("receipt"),
+  rewardMode: rewardMode("reward_mode").notNull().default("usdc"),
   treasuryAddress: text("treasury_address"),
   agentSignerAddress: text("agent_signer_address"),
   totalBudgetUsdc: usdc("total_budget_usdc").notNull(),
   rewardPerUserUsdc: usdc("reward_per_user_usdc").notNull(),
   maxPerTxUsdc: usdc("max_per_tx_usdc").notNull(),
   requiresApprovalAboveUsdc: usdc("requires_approval_above_usdc"),
+  maxUsesPerHuman: bigint("max_uses_per_human", { mode: "number" }).notNull().default(1),
   maxParticipants: bigint("max_participants", { mode: "number" }),
+  giftTokenId: bigint("gift_token_id", { mode: "number" }),
   qualifyCondition: text("qualify_condition"),
   startsAt: timestamp("starts_at", { withTimezone: true }),
   endsAt: timestamp("ends_at", { withTimezone: true }),

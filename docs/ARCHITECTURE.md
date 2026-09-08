@@ -28,7 +28,7 @@ flowchart TD
     V --> D{Deterministic policy gate}
     D -- any hard rule fails --> R[Reject: logged, reason shown]
     D -- amount > business threshold --> H[Needs business approval]
-    D -- all pass --> SIGN[Reward agent's Circle wallet signs EIP-712 authorization]
+    D -- all pass --> SIGN[Reward agent's Circle Agent Wallet executes payout]
     SIGN --> PAY[CampaignTreasury.payout on Arc]
     PAY --> USDC[USDC to consumer wallet]
     PAY --> LOG[Audit: authorized by agent 0x...]
@@ -41,12 +41,15 @@ Three independent limits, any one of them stops an over-payment:
 
 1. **The AI never sees the amount.** It returns `{valid, reason}` on the evidence
    only. The amount is the campaign's fixed `rewardPerUser`.
-2. **Circle Agent Wallet limits.** The reward agent's wallet has a USDC spending
-   cap and an allowlist (only campaign treasuries). Circle blocks anything else
-   before it reaches the chain.
-3. **The contract limits.** `CampaignTreasury` enforces the per-transaction cap
-   and the total campaign budget on-chain, and rejects a replayed claim. A valid
-   signature is necessary but not sufficient.
+2. **The deterministic policy engine.** Plain code, no AI. Checks the campaign
+   state (budget, per-human count, duplicate receipt, dates) before anything is
+   sent. A compromised or hallucinating verifier can't get past it.
+3. **Circle Agent Wallet limits.** The agent's wallet has spending limits and an
+   allowlist (mainnet); on testnet Circle still refuses to broadcast a call that
+   would revert.
+4. **The contract limits.** `CampaignTreasury` checks `msg.sender == agent`,
+   enforces the per-transaction cap and the total campaign budget on-chain, and
+   rejects a replayed claim id. Even a direct call from the agent can't overpay.
 
 ## Agent decision logic
 
