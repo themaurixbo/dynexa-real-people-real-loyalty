@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1480" height="1040" viewBox="0 0 1480 1040" font-family="Helvetica, Arial, sans-serif">
+  <rect width="1480" height="1040" fill="#0B0A10"/>
+  <text x="60" y="60" fill="#F5F3F7" font-size="30" font-weight="700">DYNEXA — where each partner is used</text>
+  <text x="60" y="92" fill="#9C98A8" font-size="16">The reward journey and which partner powers each step</text>
+
+  <!-- Actors -->
+  <g>
+    <rect x="60" y="130" width="200" height="56" rx="12" fill="#1C1B22" stroke="#3a3944"/>
+    <text x="160" y="164" fill="#F5F3F7" font-size="17" font-weight="700" text-anchor="middle">Consumer</text>
+    <rect x="1220" y="130" width="200" height="56" rx="12" fill="#1C1B22" stroke="#3a3944"/>
+    <text x="1320" y="164" fill="#F5F3F7" font-size="17" font-weight="700" text-anchor="middle">Business</text>
+  </g>
+
+  <!-- Partner panels -->
+  <!-- Privy -->
+  <g>
+    <rect x="60" y="230" width="320" height="300" rx="16" fill="#141019" stroke="#6E56CF" stroke-width="2"/>
+    <rect x="60" y="230" width="320" height="40" rx="16" fill="#6E56CF"/>
+    <rect x="60" y="254" width="320" height="16" fill="#6E56CF"/>
+    <text x="80" y="257" fill="#fff" font-size="17" font-weight="700">PRIVY · wallets</text>
+    <text x="80" y="300" fill="#E8E6EF" font-size="14">1 · Email/phone login →</text>
+    <text x="80" y="320" fill="#E8E6EF" font-size="14">   embedded wallet, no seed phrase</text>
+    <text x="80" y="352" fill="#E8E6EF" font-size="14">2 · Wallet pointed at Arc</text>
+    <text x="80" y="372" fill="#E8E6EF" font-size="14">   (custom EVM chain, defineChain)</text>
+    <text x="80" y="404" fill="#E8E6EF" font-size="14">3 · Consumer sends USDC / a gift</text>
+    <text x="80" y="424" fill="#E8E6EF" font-size="14">   to a friend by email</text>
+    <text x="80" y="456" fill="#9C98A8" font-size="14">4 · Business org wallet + spending</text>
+    <text x="80" y="476" fill="#9C98A8" font-size="14">   policy (allowlist) — in progress</text>
+  </g>
+
+  <!-- World -->
+  <g>
+    <rect x="410" y="230" width="320" height="300" rx="16" fill="#141019" stroke="#3AA0A0" stroke-width="2"/>
+    <rect x="410" y="230" width="320" height="40" rx="16" fill="#3AA0A0"/>
+    <rect x="410" y="254" width="320" height="16" fill="#3AA0A0"/>
+    <text x="430" y="257" fill="#fff" font-size="17" font-weight="700">WORLD · proof of person</text>
+    <text x="430" y="304" fill="#E8E6EF" font-size="14">5 · Selfie Check before the</text>
+    <text x="430" y="324" fill="#E8E6EF" font-size="14">   first campaign reward</text>
+    <text x="430" y="356" fill="#E8E6EF" font-size="14">6 · Backend verifies the proof</text>
+    <text x="430" y="388" fill="#E8E6EF" font-size="14">7 · nullifier stored</text>
+    <text x="430" y="408" fill="#E8E6EF" font-size="14">   UNIQUE(action, nullifier)</text>
+    <text x="430" y="440" fill="#E8E6EF" font-size="14">8 · "N per person" limit counted</text>
+    <text x="430" y="460" fill="#E8E6EF" font-size="14">   per verified human, not account</text>
+    <text x="430" y="496" fill="#9C98A8" font-size="13">signal for fairness / anti-fraud, not KYC</text>
+  </g>
+
+  <!-- Circle -->
+  <g>
+    <rect x="760" y="230" width="320" height="300" rx="16" fill="#141019" stroke="#3B5BDB" stroke-width="2"/>
+    <rect x="760" y="230" width="320" height="40" rx="16" fill="#3B5BDB"/>
+    <rect x="760" y="254" width="320" height="16" fill="#3B5BDB"/>
+    <text x="780" y="257" fill="#fff" font-size="17" font-weight="700">CIRCLE Agent Stack</text>
+    <text x="780" y="304" fill="#E8E6EF" font-size="14">9 · Reward agent = Circle Agent</text>
+    <text x="780" y="324" fill="#E8E6EF" font-size="14">   Wallet, driven by Circle CLI</text>
+    <text x="780" y="356" fill="#E8E6EF" font-size="14">10 · Executes payout() on Arc</text>
+    <text x="780" y="388" fill="#E8E6EF" font-size="14">11 · Executes GiftToken.mint()</text>
+    <text x="780" y="420" fill="#E8E6EF" font-size="14">12 · Pays verifier agent 0.001</text>
+    <text x="780" y="440" fill="#E8E6EF" font-size="14">   USDC per check (agent-to-agent)</text>
+    <text x="780" y="472" fill="#E8E6EF" font-size="14">13 · Won't broadcast a call that</text>
+    <text x="780" y="492" fill="#E8E6EF" font-size="14">   would revert</text>
+  </g>
+
+  <!-- Arc -->
+  <g>
+    <rect x="1110" y="230" width="310" height="300" rx="16" fill="#141019" stroke="#12B76A" stroke-width="2"/>
+    <rect x="1110" y="230" width="310" height="40" rx="16" fill="#12B76A"/>
+    <rect x="1110" y="254" width="310" height="16" fill="#12B76A"/>
+    <text x="1130" y="257" fill="#0B0A10" font-size="17" font-weight="700">ARC · settlement</text>
+    <text x="1130" y="304" fill="#E8E6EF" font-size="14">14 · USDC is the native gas token</text>
+    <text x="1130" y="336" fill="#E8E6EF" font-size="14">15 · CampaignTreasury: per-tx +</text>
+    <text x="1130" y="356" fill="#E8E6EF" font-size="14">   total-budget limits + replay</text>
+    <text x="1130" y="376" fill="#E8E6EF" font-size="14">   guard, on-chain</text>
+    <text x="1130" y="408" fill="#E8E6EF" font-size="14">16 · GiftToken ERC-1155:</text>
+    <text x="1130" y="428" fill="#E8E6EF" font-size="14">   mint / redeem once / burn</text>
+    <text x="1130" y="460" fill="#E8E6EF" font-size="14">17 · Business funds the treasury</text>
+    <text x="1130" y="492" fill="#E8E6EF" font-size="14">18 · POS redeem burns the token</text>
+  </g>
+
+  <!-- Backend -->
+  <g>
+    <rect x="410" y="600" width="670" height="150" rx="16" fill="#141019" stroke="#D18CFF" stroke-width="2"/>
+    <text x="430" y="632" fill="#D18CFF" font-size="16" font-weight="700">DYNEXA backend (our code, not a partner)</text>
+    <text x="430" y="666" fill="#E8E6EF" font-size="14">A · Verifier agent uses AI vision (gpt-4o-mini) → returns {valid, reason}, never an amount</text>
+    <text x="430" y="694" fill="#E8E6EF" font-size="14">B · Deterministic policy engine — 8 checks against live campaign state before anything is signed</text>
+    <text x="430" y="722" fill="#E8E6EF" font-size="14">C · Records the full pipeline + audit trail (Postgres)</text>
+  </g>
+
+  <!-- Flow arrows -->
+  <defs>
+    <marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#9C98A8"/>
+    </marker>
+  </defs>
+  <path d="M160,186 L160,230" stroke="#9C98A8" stroke-width="2" marker-end="url(#a)"/>
+  <path d="M380,380 L410,380" stroke="#9C98A8" stroke-width="2" marker-end="url(#a)" stroke-dasharray="4"/>
+  <path d="M730,380 L760,380" stroke="#9C98A8" stroke-width="2" marker-end="url(#a)"/>
+  <path d="M1080,380 L1110,380" stroke="#9C98A8" stroke-width="2" marker-end="url(#a)"/>
+  <path d="M1320,186 L1320,230" stroke="#9C98A8" stroke-width="2" marker-end="url(#a)"/>
+  <path d="M745,600 L900,530" stroke="#9C98A8" stroke-width="2" marker-end="url(#a)"/>
+  <path d="M260,158 C560,158 460,560 460,600" stroke="#9C98A8" stroke-width="2" fill="none" marker-end="url(#a)"/>
+
+  <text x="60" y="820" fill="#9C98A8" font-size="14">Flow: 1–4 Privy sets up the wallet → 5–8 World gates the first reward → A–B our backend decides → 9–13 the Circle agent acts → 14–18 Arc settles.</text>
+  <text x="60" y="990" fill="#5f5c68" font-size="13">github.com/themaurixbo/dynexa-real-people-real-loyalty · docs/ARCHITECTURE.md</text>
+</svg>
