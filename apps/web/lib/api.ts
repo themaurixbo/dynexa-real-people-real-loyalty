@@ -67,6 +67,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ code }),
     }),
+  gifts: (address: string) =>
+    req<
+      { id: string; tokenId: number; code: string; status: string; campaignName: string }[]
+    >(`/gifts?address=${address}`),
+  welcome: (contact: string, address: string) =>
+    req<{ granted?: boolean; alreadyGranted?: boolean; tokenId?: number; txHash?: string }>(
+      "/welcome",
+      { method: "POST", body: JSON.stringify({ contact, address }) },
+    ),
 };
 
 export const explorerTx = (hash: string) => `https://testnet.arcscan.app/tx/${hash}`;

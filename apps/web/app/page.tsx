@@ -27,6 +27,8 @@ export default function Home() {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          gap: 10,
+          flexWrap: "wrap",
           marginBottom: 20,
         }}
       >
