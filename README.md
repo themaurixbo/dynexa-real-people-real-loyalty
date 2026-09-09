@@ -43,10 +43,12 @@ Working end to end on Arc testnet:
 - Privy embedded consumer wallet on Arc; GiftToken mint + POS redeem + double-
   redeem block; agent-to-agent payment.
 
-Tx hashes in [docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md). Still connecting: the
-Privy business organization wallet + spending policy, and the live server running
-the Circle Agent Wallet (it currently uses the deployer key — see
-[DEPLOYMENT.md](DEPLOYMENT.md)).
+The live server runs the Circle Agent Wallet (`AGENT_SIGNER=circle`), AI vision
+verification, and the real World Selfie Check. Tx hashes in
+[docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md). Still connecting: the Privy business
+server wallet + spending policy — the code is in place but Privy has not
+authorized the app for Arc (see [FEEDBACK_PRIVY.md](FEEDBACK_PRIVY.md)), so
+business-side funding uses the deployer key for now.
 
 ## Docs
 
