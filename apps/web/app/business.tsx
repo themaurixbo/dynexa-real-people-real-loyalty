@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, type Campaign } from "../lib/api";
 import { Card, TxLink } from "./ui";
+import { TrackLoader, type TrackStep } from "./loader";
 
 export function BusinessApp() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -62,13 +63,31 @@ function CampaignList({ campaigns, onChange }: { campaigns: Campaign[]; onChange
             {Number(c.rewardPerUserUsdc)} / reward · max {Number(c.maxPerTxUsdc)} / tx · {c.maxUsesPerHuman} per person
           </div>
           <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-            <Action label="Fund 5" run={() => api.fund(c.id, "5")} onChange={onChange} />
+            <Action
+              label="Fund 5"
+              run={() => api.fund(c.id, "5")}
+              onChange={onChange}
+              steps={[
+                { brand: "Arc", label: "Approving USDC for the campaign treasury" },
+                { brand: "Arc", label: "Moving the funds into the treasury" },
+                { brand: "Arc", label: "Confirming on Arc" },
+              ]}
+            />
             <Action
               label={c.status === "paused" ? "Resume" : "Pause"}
               run={() => api.pause(c.id, c.status !== "paused")}
               onChange={onChange}
+              steps={[{ brand: "Arc", label: "Updating the campaign on Arc" }]}
             />
-            <Action label="Close" run={() => api.close(c.id)} onChange={onChange} />
+            <Action
+              label="Close"
+              run={() => api.close(c.id)}
+              onChange={onChange}
+              steps={[
+                { brand: "Arc", label: "Closing the campaign" },
+                { brand: "Arc", label: "Refunding the remaining USDC to the business" },
+              ]}
+            />
           </div>
         </Card>
       ))}
@@ -80,30 +99,35 @@ function Action({
   label,
   run,
   onChange,
+  steps,
 }: {
   label: string;
   run: () => Promise<unknown>;
   onChange: () => void;
+  steps?: TrackStep[];
 }) {
   const [busy, setBusy] = useState(false);
   return (
-    <button
-      className="btn-ghost"
-      disabled={busy}
-      onClick={async () => {
-        setBusy(true);
-        try {
-          await run();
-          onChange();
-        } catch (e) {
-          alert((e as Error).message);
-        } finally {
-          setBusy(false);
-        }
-      }}
-    >
-      {busy ? "…" : label}
-    </button>
+    <>
+      {busy && steps && <TrackLoader steps={steps} />}
+      <button
+        className="btn-ghost"
+        disabled={busy}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            await run();
+            onChange();
+          } catch (e) {
+            alert((e as Error).message);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? "…" : label}
+      </button>
+    </>
   );
 }
 
@@ -124,6 +148,22 @@ function CreateCampaign({ onCreated }: { onCreated: () => void }) {
 
   return (
     <Card style={{ maxWidth: 520 }}>
+      {busy && (
+        <TrackLoader
+          title="Creating the campaign"
+          steps={
+            f.rewardMode === "gift"
+              ? [
+                  { brand: "Arc", label: "Deploying the campaign treasury on Arc" },
+                  { brand: "Arc", label: "Registering the branded gift (GiftToken)" },
+                ]
+              : [
+                  { brand: "Arc", label: "Deploying the campaign treasury on Arc" },
+                  { brand: "Arc", label: "Setting the per-tx and total limits on-chain" },
+                ]
+          }
+        />
+      )}
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <Field label="Campaign name">
           <input className="field" value={f.name} onChange={(e) => set("name", e.target.value)} />
@@ -218,6 +258,15 @@ function Pos() {
 
   return (
     <Card style={{ maxWidth: 420 }}>
+      {busy && (
+        <TrackLoader
+          title="Redeeming the gift"
+          steps={[
+            { brand: "DYNEXA", label: "Looking up the gift code" },
+            { brand: "Arc", label: "Redeeming and burning the GiftToken on Arc" },
+          ]}
+        />
+      )}
       <div className="label" style={{ marginBottom: 6 }}>
         Point of sale — redeem a gift
       </div>

@@ -142,3 +142,72 @@ a {
   color: var(--magenta);
   text-decoration: none;
 }
+
+/* track loader */
+@keyframes tl-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes tl-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.09);
+    opacity: 0.8;
+  }
+}
+@keyframes tl-fade {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.tl-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(6, 5, 10, 0.72);
+  backdrop-filter: blur(9px);
+  animation: tl-fade 0.2s ease both;
+}
+.tl-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.12);
+  border-top-color: var(--tl-accent, #d18cff);
+  animation: tl-spin 0.95s linear infinite;
+}
+.tl-badge {
+  animation: tl-pulse 1.6s ease-in-out infinite;
+}
+.tl-step {
+  animation: tl-fade 0.3s ease both;
+}
+.tl-dots {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+}
+.tl-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  transition: background 0.3s;
+}
+.tl-dot.on {
+  background: var(--tl-accent, #d18cff);
+}

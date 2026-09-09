@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { IDKitRequestWidget, selfieCheckLegacy } from "@worldcoin/idkit";
 import { api } from "../lib/api";
 import { Partner } from "./ui";
+import { TrackLoader } from "./loader";
 
 /**
  * World Selfie Check. Shown until the user is verified; after that the caller
@@ -21,6 +22,7 @@ export function WorldVerify({
   const [open, setOpen] = useState(false);
   const [session, setSession] = useState<Awaited<ReturnType<typeof api.worldSession>> | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
 
   const start = useCallback(async () => {
     setErr(null);
@@ -53,15 +55,28 @@ export function WorldVerify({
           environment={session.environment as "staging" | "production" | "sandbox"}
           preset={selfieCheckLegacy({ signal: wallet })}
           onSuccess={async (result) => {
+            setChecking(true);
             try {
               const r = await api.worldVerify(contact, wallet, result);
               if (r.verified) onVerified();
               else setErr(r.error ?? "verification failed");
             } catch (e) {
               setErr((e as Error).message);
+            } finally {
+              setChecking(false);
             }
           }}
           onError={(e) => setErr(String((e as unknown as { code?: string })?.code ?? e))}
+        />
+      )}
+
+      {checking && (
+        <TrackLoader
+          title="World Selfie Check"
+          steps={[
+            { brand: "World", label: "Verifying your proof of personhood" },
+            { brand: "World", label: "Making sure this person hasn't claimed before" },
+          ]}
         />
       )}
     </div>

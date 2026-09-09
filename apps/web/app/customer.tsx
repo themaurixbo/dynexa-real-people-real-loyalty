@@ -5,6 +5,7 @@ import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { api, type Campaign, type ClaimResult } from "../lib/api";
 import { usdcBalance } from "../lib/chain";
 import { Amount, Card, Logo, Partner, TxLink } from "./ui";
+import { TrackLoader } from "./loader";
 import { WorldVerify, useWorldStatus } from "./world";
 
 type Gift = { id: string; tokenId: number; code: string; status: string; campaignName: string };
@@ -50,7 +51,21 @@ export function CustomerApp() {
   }
 
   const contact = user?.email?.address ?? user?.phone?.number ?? user?.id ?? "";
-  return <Home wallet={wallet?.address} contact={contact} />;
+
+  if (!wallet?.address) {
+    return (
+      <TrackLoader
+        inline
+        title="Almost there"
+        steps={[
+          { brand: "Privy", label: "Creating your wallet — no seed phrase" },
+          { brand: "Arc", label: "Connecting it to Arc" },
+        ]}
+      />
+    );
+  }
+
+  return <Home wallet={wallet.address} contact={contact} />;
 }
 
 function Home({ wallet, contact }: { wallet?: string; contact: string }) {
@@ -331,6 +346,23 @@ function ClaimModal({
     }
   }
 
+  const claimSteps =
+    campaign.rewardMode === "gift"
+      ? [
+          { brand: "World" as const, label: "Checking you are a real, unique person" },
+          { brand: "DYNEXA" as const, label: "The agent reviews your proof of purchase" },
+          { brand: "DYNEXA" as const, label: "Applying the campaign's rules and limits" },
+          { brand: "Circle" as const, label: "The Circle Agent Wallet mints your gift" },
+          { brand: "Arc" as const, label: "Confirming the GiftToken on Arc" },
+        ]
+      : [
+          { brand: "World" as const, label: "Checking you are a real, unique person" },
+          { brand: "DYNEXA" as const, label: "The agent reviews your proof of purchase" },
+          { brand: "DYNEXA" as const, label: "Applying the campaign's rules and limits" },
+          { brand: "Circle" as const, label: "The Circle Agent Wallet sends your reward" },
+          { brand: "Arc" as const, label: "Confirming the USDC payment on Arc" },
+        ];
+
   return (
     <div
       onClick={onClose}
@@ -345,6 +377,7 @@ function ClaimModal({
         zIndex: 60,
       }}
     >
+      {busy && <TrackLoader title="Processing your claim" steps={claimSteps} />}
       <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 400 }}>
         <Card>
           {!result ? (
@@ -370,7 +403,7 @@ function ClaimModal({
                 disabled={busy}
                 onClick={submit}
               >
-                {busy ? "The agent is checking…" : "Submit claim"}
+                {busy ? "Working…" : "Submit claim"}
               </button>
             </>
           ) : (

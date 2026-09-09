@@ -41,27 +41,57 @@ export function TxLink({ hash }: { hash?: string }) {
   );
 }
 
-/** "powered by <partner>" chip, so it's clear which track does what. */
-export function Partner({ name }: { name: "World" | "Privy" | "Arc" }) {
-  const mark = {
+export type BrandName = "World" | "Privy" | "Circle" | "Arc" | "DYNEXA";
+
+export const brandAccent: Record<BrandName, string> = {
+  World: "#f5f3f7",
+  Privy: "#d18cff",
+  Circle: "#4ade80",
+  Arc: "#22e5ff",
+  DYNEXA: "#ff2fe0",
+};
+
+/** Simple, recognizable partner marks. Uses currentColor so the caller sets the tint. */
+export function BrandMark({ name, size = 14 }: { name: BrandName; size?: number }) {
+  if (name === "DYNEXA") return <Logo size={size} />;
+  const paths: Record<Exclude<BrandName, "DYNEXA">, React.ReactNode> = {
     World: (
-      <svg width="12" height="12" viewBox="0 0 24 24">
-        <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" strokeWidth="2" />
-        <circle cx="12" cy="9" r="3.4" fill="currentColor" />
-      </svg>
+      <>
+        <circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" strokeWidth="2" />
+        <circle cx="12" cy="9" r="3.6" fill="currentColor" />
+      </>
     ),
     Privy: (
-      <svg width="12" height="12" viewBox="0 0 24 24">
-        <path d="M6 20V6a6 6 0 1 1 6 6H6" fill="none" stroke="currentColor" strokeWidth="2.4" />
-      </svg>
+      <path
+        d="M7 21V8.5a5.5 5.5 0 1 1 5.5 5.5H7"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.6"
+        strokeLinecap="round"
+      />
+    ),
+    Circle: (
+      <>
+        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="2.2" />
+        <circle cx="12" cy="12" r="3.4" fill="currentColor" />
+      </>
     ),
     Arc: (
-      <svg width="12" height="12" viewBox="0 0 24 24">
-        <path d="M4 20a8 8 0 0 1 16 0" fill="none" stroke="currentColor" strokeWidth="2.4" />
-        <circle cx="12" cy="9" r="2.4" fill="currentColor" />
-      </svg>
+      <>
+        <path d="M3 19a9 9 0 0 1 18 0" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+        <circle cx="12" cy="8.5" r="2.6" fill="currentColor" />
+      </>
     ),
-  }[name];
+  };
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
+      {paths[name as Exclude<BrandName, "DYNEXA">]}
+    </svg>
+  );
+}
+
+/** "via <partner>" chip, so it's clear which track does what. */
+export function Partner({ name }: { name: BrandName }) {
   return (
     <span
       style={{
@@ -76,7 +106,10 @@ export function Partner({ name }: { name: "World" | "Privy" | "Arc" }) {
         padding: "3px 8px",
       }}
     >
-      {mark} {name}
+      <span style={{ color: brandAccent[name], display: "inline-flex" }}>
+        <BrandMark name={name} size={12} />
+      </span>
+      {name}
     </span>
   );
 }
