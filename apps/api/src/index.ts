@@ -4,6 +4,7 @@ import { env } from "./lib/env.js";
 import { agentSigner } from "./agent/signer.js";
 import { campaignRoutes } from "./routes/campaigns.js";
 import { claimRoutes } from "./routes/claims.js";
+import { businessRoutes } from "./routes/business.js";
 import { giftRoutes } from "./routes/gifts.js";
 import { redeemRoutes } from "./routes/redeem.js";
 import { worldRoutes } from "./routes/world.js";
@@ -24,6 +25,7 @@ await app.register(claimRoutes);
 await app.register(giftRoutes);
 await app.register(redeemRoutes);
 await app.register(worldRoutes);
+await app.register(businessRoutes);
 
 app
   .listen({ port: env.port, host: "0.0.0.0" })

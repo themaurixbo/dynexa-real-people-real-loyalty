@@ -52,6 +52,7 @@ export const businesses = pgTable("businesses", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   walletAddress: text("wallet_address"),
+  privyWalletId: text("privy_wallet_id"),
   createdAt: createdAt(),
 });
 

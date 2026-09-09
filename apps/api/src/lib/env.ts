@@ -44,4 +44,6 @@ export const env = {
   },
   privyAppId: process.env.PRIVY_APP_ID ?? "",
   privyAppSecret: process.env.PRIVY_APP_SECRET ?? "",
+  privyAuthKey: process.env.PRIVY_AUTHORIZATION_KEY ?? "",
+  privyPolicyId: process.env.PRIVY_BUSINESS_POLICY_ID ?? "",
 };
