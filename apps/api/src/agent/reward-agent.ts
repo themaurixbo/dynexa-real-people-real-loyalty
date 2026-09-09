@@ -49,7 +49,10 @@ export async function runRewardClaim(reqBody: ClaimRequest): Promise<ClaimResult
   if (!campaign.treasuryAddress) throw new Error("campaign has no treasury");
 
   const user = await findOrCreateUser(reqBody.contact, reqBody.customerAddress);
-  const nullifierHash = await ensureVerified(user.id);
+  const verification = await getVerification(user.id);
+  const nullifierHash = verification
+    ? keccak256(toHex(verification.nullifierHash))
+    : keccak256(toHex(`unverified:${user.id}`));
   const receiptHash = keccak256(toHex(reqBody.receiptRef));
 
   // --- gather real signals ---
@@ -85,7 +88,7 @@ export async function runRewardClaim(reqBody: ClaimRequest): Promise<ClaimResult
       (!campaign.startsAt || campaign.startsAt <= now) &&
       (!campaign.endsAt || campaign.endsAt >= now),
     evidenceValid: verdict.valid,
-    humanVerified: true,
+    humanVerified: Boolean(verification) || env.world.devBypass,
     receiptAlreadyUsed: Boolean(dup),
     priorClaimsByHuman: priorClaims,
     maxUsesPerHuman: campaign.maxUsesPerHuman ?? 1,
@@ -340,24 +343,11 @@ export async function findOrCreateUser(contact: string, addr?: `0x${string}`) {
   return user;
 }
 
-/**
- * Day 1 stub: pretend the user did the World check. Day 3 this becomes a real
- * check against a stored World nullifier.
- */
-async function ensureVerified(userId: string): Promise<`0x${string}`> {
-  const existing = await db.query.worldVerifications.findFirst({
+/** Real World verification, stored by POST /world/verify. No stub. */
+async function getVerification(userId: string) {
+  return db.query.worldVerifications.findFirst({
     where: eq(worldVerifications.userId, userId),
   });
-  if (existing) return keccak256(toHex(existing.nullifierHash));
-
-  const nullifier = `stub:${userId}`;
-  await db.insert(worldVerifications).values({
-    userId,
-    action: "verify-human-welcome",
-    nullifierHash: nullifier,
-    credentialType: "stub",
-  });
-  return keccak256(toHex(nullifier));
 }
 
 async function finish(claimId: string, status: "rejected", reason: string) {

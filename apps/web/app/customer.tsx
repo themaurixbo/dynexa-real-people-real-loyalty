@@ -5,6 +5,7 @@ import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { api, type Campaign, type ClaimResult } from "../lib/api";
 import { usdcBalance } from "../lib/chain";
 import { Amount, Card, Logo, Partner, TxLink } from "./ui";
+import { WorldVerify, useWorldStatus } from "./world";
 
 type Gift = { id: string; tokenId: number; code: string; status: string; campaignName: string };
 
@@ -54,6 +55,7 @@ export function CustomerApp() {
 
 function Home({ wallet, contact }: { wallet?: string; contact: string }) {
   const [tab, setTab] = useState<"home" | "wallet" | "gifts" | "profile">("home");
+  const { verified, setVerified } = useWorldStatus(wallet);
   const [balance, setBalance] = useState<string | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [gifts, setGifts] = useState<Gift[]>([]);
@@ -80,10 +82,21 @@ function Home({ wallet, contact }: { wallet?: string; contact: string }) {
     <div style={{ paddingBottom: 88 }}>
       {(tab === "home" || tab === "wallet") && (
         <section style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <span className="pill pill-verified">✓ Human Verified</span>
-            <Partner name="World" />
-          </div>
+          {verified ? (
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <span className="pill pill-verified">✓ Human Verified</span>
+              <Partner name="World" />
+            </div>
+          ) : wallet ? (
+            <Card>
+              <div style={{ fontWeight: 700, marginBottom: 4 }}>One quick check</div>
+              <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 10 }}>
+                Before your first reward, confirm you are a real person. Takes a few
+                seconds, no personal data is stored.
+              </p>
+              <WorldVerify contact={contact} wallet={wallet} onVerified={() => setVerified(true)} />
+            </Card>
+          ) : null}
 
           <Card>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

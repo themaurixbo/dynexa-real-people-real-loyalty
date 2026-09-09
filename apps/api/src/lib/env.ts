@@ -32,4 +32,16 @@ export const env = {
   circleChain: process.env.CIRCLE_CHAIN ?? "ARC-TESTNET",
   aiProvider: process.env.AI_PROVIDER ?? "openai",
   openaiKey: process.env.OPENAI_API_KEY ?? "",
+  world: {
+    appId: process.env.WORLD_APP_ID ?? "",
+    rpId: process.env.WORLD_RP_ID ?? "",
+    action: process.env.WORLD_ACTION_ID ?? "verify-human-welcome",
+    signingKey: (process.env.WORLD_RP_SIGNING_KEY ?? "").trim(),
+    env: process.env.WORLD_ENVIRONMENT ?? "staging",
+    // when the Selfie Check flag isn't available, accept a claim without a
+    // stored verification (local demo only)
+    devBypass: process.env.WORLD_DEV_BYPASS === "1",
+  },
+  privyAppId: process.env.PRIVY_APP_ID ?? "",
+  privyAppSecret: process.env.PRIVY_APP_SECRET ?? "",
 };

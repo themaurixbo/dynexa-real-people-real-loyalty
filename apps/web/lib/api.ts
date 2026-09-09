@@ -76,6 +76,26 @@ export const api = {
       "/welcome",
       { method: "POST", body: JSON.stringify({ contact, address }) },
     ),
+  worldSession: () =>
+    req<{
+      appId: string;
+      action: string;
+      environment: string;
+      rpContext: {
+        rp_id: string;
+        nonce: string;
+        created_at: number;
+        expires_at: number;
+        signature: string;
+      };
+    }>("/world/session"),
+  worldStatus: (address: string) =>
+    req<{ verified: boolean }>(`/world/status?address=${address}`),
+  worldVerify: (contact: string, address: string, proof: unknown) =>
+    req<{ verified: boolean; error?: string }>("/world/verify", {
+      method: "POST",
+      body: JSON.stringify({ contact, address, proof }),
+    }),
 };
 
 export const explorerTx = (hash: string) => `https://testnet.arcscan.app/tx/${hash}`;

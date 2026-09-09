@@ -6,6 +6,7 @@ import { campaignRoutes } from "./routes/campaigns.js";
 import { claimRoutes } from "./routes/claims.js";
 import { giftRoutes } from "./routes/gifts.js";
 import { redeemRoutes } from "./routes/redeem.js";
+import { worldRoutes } from "./routes/world.js";
 
 const app = Fastify({ logger: true });
 
@@ -22,6 +23,7 @@ await app.register(campaignRoutes);
 await app.register(claimRoutes);
 await app.register(giftRoutes);
 await app.register(redeemRoutes);
+await app.register(worldRoutes);
 
 app
   .listen({ port: env.port, host: "0.0.0.0" })
