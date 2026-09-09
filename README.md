@@ -29,11 +29,23 @@ Finally, we will test the complete journey, including duplicate claims, excessiv
 
 ## Status
 
-The autonomous agent flow works end to end on Arc testnet: a claim comes in, the
-policy engine checks it against the live campaign, and a **Circle Agent Wallet
-executes the USDC payout** — see [docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md).
-Backend (`apps/api`), contracts and the DB schema are in. Next: Privy
-business/consumer wallets, the GiftToken contract, and World Selfie Check.
+Live: **[realloyalty.dynexa.us](https://realloyalty.dynexa.us)** (frontend) ·
+**apirealloyalty.dynexa.us** (backend).
+
+Working end to end on Arc testnet:
+
+- Autonomous agent: claim → policy engine (8 checks) → Circle Agent Wallet
+  executes the USDC payout (or the GiftToken mint). Over-limit payouts revert.
+- `CampaignTreasuryFactory` and `GiftToken` deployed and **verified on ArcScan**.
+- World Selfie Check: RP signature, proof verification, nullifier gate — a claim
+  without verification is rejected.
+- Privy embedded consumer wallet on Arc; GiftToken mint + POS redeem + double-
+  redeem block; agent-to-agent payment.
+
+Tx hashes in [docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md). Still connecting: the
+Privy business organization wallet + spending policy, and the live server running
+the Circle Agent Wallet (it currently uses the deployer key — see
+[DEPLOYMENT.md](DEPLOYMENT.md)).
 
 ## Docs
 
