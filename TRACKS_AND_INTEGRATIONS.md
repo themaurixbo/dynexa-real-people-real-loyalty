@@ -29,19 +29,25 @@ Ease of use: 7/10.
 
 > We use Privy to create an embedded wallet when users sign in with email or
 > phone, letting them receive and view USDC rewards on Arc without seed phrases
-> or MetaMask. For businesses, we are adding a Privy organization wallet with
-> spending policies to fund campaigns securely without blockchain complexity.
+> or MetaMask. On the business side we create a Privy server wallet with a
+> spending policy attached, so campaign funding is a controlled backend action.
 
 Code: `apps/web/app/providers.tsx` (PrivyProvider, Arc custom chain,
-`createOnLogin`), `apps/web/app/customer.tsx` (`usePrivy` / `useWallets`).
+`createOnLogin`), `apps/web/app/customer.tsx` (`usePrivy` / `useWallets`),
+`apps/api/src/lib/privy.ts` + `apps/api/src/routes/business.ts` (server wallet,
+policy, funding endpoints).
 
-Ease of use: 8/10.
+Ease of use: 7/10.
 
-> Privy's defineChain, defaultChain and supportedChains made the Arc integration
-> simple and worked without problems. The main challenge was finding the correct
-> createOnLogin configuration and understanding which wallet actions and server
-> controls are available for these custom chains. I think a better quickstart
-> guide is missing.
+> defineChain / defaultChain / supportedChains made the consumer embedded-wallet
+> integration on Arc work first try. The server wallet was harder: a Privy server
+> wallet can't transact on a custom chain like Arc (`eip155:5042002`) — every
+> send returns "App is not authorized to transact on chain", and the dashboard
+> (App settings and Wallet infrastructure → Advanced, both tabs) has no place to
+> authorize a custom EVM chain for server wallets. So the policy is attached and
+> the code path is in place, but on-Arc business funding falls back to a direct
+> key. A dashboard toggle for custom server-wallet chains, or docs saying they're
+> preset-only, would help. Full notes in `FEEDBACK_PRIVY.md`.
 
 ### World — Selfie Check
 
@@ -77,6 +83,10 @@ Ease of use: 7/10.
 
 ## Status
 
-Contracts, the autonomous agent, GiftToken, the Privy consumer wallet and the
-web app are done and verified on Arc testnet. Still connecting: the live World
-Selfie Check proof exchange, and the Privy business organization wallet + policy.
+Contracts, the autonomous agent, GiftToken, the Privy consumer wallet, the live
+World Selfie Check and the web app are done, deployed, and verified on Arc
+testnet. The Privy business server wallet + spending policy is built and
+deployed, but Privy server wallets only transact on a preset chain list
+(Ethereum, Base, Arbitrum, Polygon, Solana, Tron, Tempo) — Arc is not on it and
+there is no dashboard option to add it — so business-side funding uses a direct
+key. See `FEEDBACK_PRIVY.md`.
