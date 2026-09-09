@@ -36,7 +36,8 @@ Working end to end on Arc testnet:
 
 - Autonomous agent: claim → policy engine (8 checks) → Circle Agent Wallet
   executes the USDC payout (or the GiftToken mint). Over-limit payouts revert.
-- `CampaignTreasuryFactory` and `GiftToken` deployed and **verified on ArcScan**.
+- `CampaignTreasuryFactory`, `GiftToken` and a live `CampaignTreasury` deployed
+  and **verified on ArcScan**.
 - World Selfie Check: RP signature, proof verification, nullifier gate — a claim
   without verification is rejected.
 - Privy embedded consumer wallet on Arc; GiftToken mint + POS redeem + double-

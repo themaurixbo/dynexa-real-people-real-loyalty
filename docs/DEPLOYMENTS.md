@@ -8,6 +8,9 @@ Explorer: https://testnet.arcscan.app
 |---|---|
 | CampaignTreasuryFactory | `0xD6854881284ffa154f92a9b9325Ee09774370e91` |
 | GiftToken (ERC-1155) | `0xc9F3ABBd3D1f29391FA08158eD6AcfDA2990E192` |
+| CampaignTreasury (demo campaign) | `0x223675DD3599f5a933a67f9D7a4f1d78DC85F96b` |
+
+All three are source-verified on ArcScan (Blockscout).
 
 | Agent | Circle Agent Wallet |
 |---|---|
