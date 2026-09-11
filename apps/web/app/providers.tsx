@@ -23,7 +23,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <PrivyProvider
       appId={appId}
       config={{
-        loginMethods: ["email", "sms"],
+        loginMethods: ["email", "sms", "google"],
         appearance: { theme: "dark", accentColor: "#D18CFF" },
         defaultChain: arcTestnet,
         supportedChains: [arcTestnet],
