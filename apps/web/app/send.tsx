@@ -3,9 +3,17 @@
 import { useEffect, useState } from "react";
 import { useSendTransaction } from "@privy-io/react-auth";
 import { api, type TransferInfo } from "../lib/api";
-import { USDC, arcTestnet, giftTransferData, usdcTransferData } from "../lib/chain";
+import { USDC, arcTestnet, giftTransferData, usdcBalance, usdcTransferData } from "../lib/chain";
 import { Card, TxLink } from "./ui";
 import { TrackLoader } from "./loader";
+
+/** Turns a raw chain/wallet error into something a customer can read. */
+function friendlyChainError(raw: string): string {
+  if (/exceeds balance|insufficient/i.test(raw)) return "You don't have enough USDC for that.";
+  if (/intrinsic gas|gas too low/i.test(raw)) return "The network rejected the transaction. Please try again.";
+  if (/rejected|denied|cancel/i.test(raw)) return "Transaction cancelled.";
+  return "Something went wrong sending that. Please try again.";
+}
 
 /** Send USDC to a friend by link — they claim it into their own wallet, created on the spot if needed. */
 export function SendModal({
@@ -30,6 +38,11 @@ export function SendModal({
       setError("Enter an amount above 0.");
       return;
     }
+    const balance = await usdcBalance(wallet);
+    if (Number(balance) < Number(amount)) {
+      setError(`You only have ${balance} USDC available.`);
+      return;
+    }
     setBusy(true);
     try {
       const { escrow } = await api.health();
@@ -49,7 +62,7 @@ export function SendModal({
       });
       setLink(`${window.location.origin}/?gift=${code}`);
     } catch (e) {
-      setError((e as Error).message);
+      setError(friendlyChainError((e as Error).message));
     } finally {
       setBusy(false);
     }
@@ -308,7 +321,7 @@ export function GiftShareModal({
         onSent();
       }
     } catch (e) {
-      setError((e as Error).message);
+      setError(friendlyChainError((e as Error).message));
     } finally {
       setBusy(false);
     }

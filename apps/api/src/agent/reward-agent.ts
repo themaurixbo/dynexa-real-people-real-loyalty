@@ -178,17 +178,27 @@ export async function runRewardClaim(reqBody: ClaimRequest): Promise<ClaimResult
       txHash: verdict.paymentTx,
     });
   }
+  // If the evidence itself failed, tell the customer exactly what the AI saw
+  // (e.g. "the invoice total is 150 Bs, not 200") instead of a generic line.
+  const failedCode = policy.checks.find((c) => !c.ok)?.code;
+  const rejectReason =
+    policy.outcome === "reject" && failedCode === "EVIDENCE_VALID" && verdict.reason
+      ? verdict.reason
+      : policy.outcome === "reject"
+        ? policy.reason
+        : null;
+
   await db.insert(policyResults).values({
     claimId: claim.id,
     passed: policy.outcome === "pass",
     checks: policy.checks,
-    failureReason: policy.outcome === "reject" ? policy.reason : null,
+    failureReason: rejectReason,
   });
 
   if (policy.outcome === "reject") {
-    await finish(claim.id, "rejected", policy.reason);
-    await audit("agent", "claim.rejected", "claim", claim.id, { reason: policy.reason });
-    return { claimId: claim.id, status: "rejected", reason: policy.reason, reasonCodes };
+    await finish(claim.id, "rejected", rejectReason!);
+    await audit("agent", "claim.rejected", "claim", claim.id, { reason: rejectReason });
+    return { claimId: claim.id, status: "rejected", reason: rejectReason!, reasonCodes };
   }
 
   if (policy.outcome === "needs_approval") {
