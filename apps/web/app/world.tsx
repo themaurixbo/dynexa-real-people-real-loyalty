@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { IDKitRequestWidget, selfieCheckLegacy } from "@worldcoin/idkit";
 import { api } from "../lib/api";
-import { Partner } from "./ui";
+import { ErrorNote } from "./ui";
 import { TrackLoader } from "./loader";
 
 /**
@@ -36,13 +36,10 @@ export function WorldVerify({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <button className="btn-ghost" onClick={start}>
-          Verify you are a real person
-        </button>
-        <Partner name="World" />
-      </div>
-      {err && <span style={{ color: "#ff8a8a", fontSize: 12 }}>{err}</span>}
+      <button className="btn-primary" onClick={start}>
+        Verify you are a real person
+      </button>
+      {err && <ErrorNote message={err} />}
 
       {session && (
         <IDKitRequestWidget

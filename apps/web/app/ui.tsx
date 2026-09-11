@@ -61,8 +61,15 @@ export function BrandMark({ name, size = 14 }: { name: BrandName; size?: number 
   const paths: Record<Exclude<BrandName, "DYNEXA">, React.ReactNode> = {
     World: (
       <>
-        <circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" strokeWidth="2" />
-        <circle cx="12" cy="9" r="3.6" fill="currentColor" />
+        <circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
+        <path
+          d="M9.3 7.2V16.8M9.3 7.2H15M9.3 12H14M9.3 16.8H15"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
       </>
     ),
     Privy: (

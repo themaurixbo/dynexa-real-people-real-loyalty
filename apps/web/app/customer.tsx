@@ -5,7 +5,7 @@ import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { api, type Campaign, type ClaimResult } from "../lib/api";
 import { usdcBalance } from "../lib/chain";
 import { fileToDataUrl } from "../lib/image";
-import { Amount, Card, ErrorNote, Logo, Partner, TxLink } from "./ui";
+import { Amount, BrandMark, Card, ErrorNote, Logo, Partner, TxLink } from "./ui";
 import { TrackLoader } from "./loader";
 import { ClaimGiftCard, ClaimGiftTokenCard, GiftShareModal, ReferralModal, SendModal } from "./send";
 import { WorldVerify, useWorldStatus } from "./world";
@@ -238,25 +238,66 @@ function Home({
           )}
 
           {verified ? (
-            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-              <span className="pill pill-verified">✓ Human Verified</span>
-              <Partner name="World" />
-            </div>
+            <Card>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div
+                  style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: "50%",
+                    flexShrink: 0,
+                    background: "radial-gradient(circle at 35% 30%, #1c1b22, #0b0a10)",
+                    border: "1px solid rgba(52,211,153,0.4)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--green)",
+                  }}
+                >
+                  <BrandMark name="World" size={22} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14.5 }}>You&apos;re Human Verified</div>
+                  <div style={{ fontSize: 11.5, color: "var(--muted)" }}>
+                    Verified with World — real, unique, one account.
+                  </div>
+                </div>
+              </div>
+            </Card>
           ) : wallet ? (
             <Card>
-              <div style={{ fontWeight: 700, marginBottom: 4 }}>One quick check</div>
-              <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 10 }}>
-                Before your first reward, confirm you are a real person. Takes a few
-                seconds, no personal data is stored. This also unlocks your welcome gift.
-              </p>
-              <WorldVerify
-                contact={contact}
-                wallet={wallet}
-                onVerified={() => {
-                  setVerified(true);
-                  grantWelcome();
-                }}
-              />
+              <div style={{ textAlign: "center" }}>
+                <div
+                  style={{
+                    width: 72,
+                    height: 72,
+                    margin: "4px auto 14px",
+                    borderRadius: "50%",
+                    background: "radial-gradient(circle at 35% 30%, #232030, #0b0a10)",
+                    border: "1px solid rgba(255,255,255,0.14)",
+                    boxShadow: "0 0 0 6px rgba(209,140,255,0.06), 0 0 30px rgba(209,140,255,0.12)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#fff",
+                  }}
+                >
+                  <BrandMark name="World" size={36} />
+                </div>
+                <div style={{ fontWeight: 700, fontSize: 17 }}>Verify you&apos;re human</div>
+                <p style={{ fontSize: 13, color: "var(--muted)", margin: "6px 0 16px", lineHeight: 1.5 }}>
+                  One quick check with World — a few seconds, no personal data stored.
+                  Unlocks your welcome gift and every reward after it.
+                </p>
+                <WorldVerify
+                  contact={contact}
+                  wallet={wallet}
+                  onVerified={() => {
+                    setVerified(true);
+                    grantWelcome();
+                  }}
+                />
+              </div>
             </Card>
           ) : null}
 
@@ -618,7 +659,6 @@ function ClaimModal({
   onClose: () => void;
 }) {
   const isSelfie = campaign.rewardType === "selfie";
-  const [note, setNote] = useState("");
   const [photo, setPhoto] = useState<string | null>(null);
   const [socialLink, setSocialLink] = useState("");
   const [useLink, setUseLink] = useState(false);
@@ -654,7 +694,6 @@ function ClaimModal({
           contact,
           customerAddress: wallet,
           evidenceUrl,
-          evidenceText: note || undefined,
           receiptRef: `${contact}-${Date.now()}`,
           referralCode,
         }),
@@ -787,17 +826,6 @@ function ClaimModal({
                 </label>
               )}
               {photoError && <p style={{ color: "#ff8a8a", fontSize: 12, marginTop: 6 }}>{photoError}</p>}
-
-              <div className="label" style={{ marginTop: 12, marginBottom: 6 }}>
-                Anything else to add? (optional)
-              </div>
-              <textarea
-                className="field"
-                rows={2}
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="e.g. it's a pistachio ice cream cone"
-              />
               {error && <ErrorNote message={error} />}
               <button
                 className="btn-primary"

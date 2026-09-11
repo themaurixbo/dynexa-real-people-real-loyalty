@@ -92,7 +92,10 @@ async function visionCheck(input: VerdictInput): Promise<Omit<Verdict, "paymentT
       ? "The next image(s) after the proof are reference photos of the real product/brand — use them " +
         "as visual context, they are not the proof itself. "
       : "") +
-    `Answer strictly as JSON: {"valid": boolean, "reason": string (one short sentence)}.`;
+    `Answer strictly as JSON: {"valid": boolean, "reason": string}. The reason must be one short, ` +
+    `concrete sentence naming exactly what you saw or didn't see — an amount, an item, a mismatch ` +
+    `(e.g. "The invoice total is 150 Bs, below the 200 Bs required" or "No Coca-Cola item is visible ` +
+    `on the receipt"). Never a generic line like "does not match".`;
 
   const content: Array<{ type: string; text?: string; image_url?: { url: string } }> = [
     { type: "text", text: prompt },
