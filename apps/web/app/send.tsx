@@ -36,6 +36,8 @@ export function SendModal({
       const { hash } = await sendTransaction({
         to: USDC,
         data: usdcTransferData(escrow, amount),
+        value: "0x0",
+        gasLimit: 120_000,
         chainId: arcTestnet.id,
       });
       const { code } = await api.createTransfer({
@@ -287,6 +289,8 @@ export function GiftShareModal({
       const { hash } = await sendTransaction({
         to: giftToken,
         data: giftTransferData(wallet, giftToken, tokenId),
+        value: "0x0",
+        gasLimit: 200_000,
         chainId: arcTestnet.id,
       });
       const r = await api.createGiftTransfer({
