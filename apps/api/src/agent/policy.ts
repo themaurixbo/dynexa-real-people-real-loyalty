@@ -5,6 +5,7 @@
 
 export interface PolicyInput {
   rewardMode: "usdc" | "gift";
+  platformActive: boolean;
   campaignActive: boolean;
   withinDates: boolean;
   evidenceValid: boolean;
@@ -30,6 +31,7 @@ export interface Check {
 
 export function evaluatePolicy(i: PolicyInput): PolicyDecision {
   const checks: Check[] = [
+    { code: "PLATFORM_ACTIVE", ok: i.platformActive },
     { code: "CAMPAIGN_ACTIVE", ok: i.campaignActive },
     { code: "WITHIN_DATES", ok: i.withinDates },
     { code: "HUMAN_VERIFIED", ok: i.humanVerified },
@@ -53,6 +55,8 @@ export function evaluatePolicy(i: PolicyInput): PolicyDecision {
 
 function reasonFor(code: string): string {
   switch (code) {
+    case "PLATFORM_ACTIVE":
+      return "Rewards are paused platform-wide right now. Try again later.";
     case "CAMPAIGN_ACTIVE":
       return "The campaign is not active.";
     case "WITHIN_DATES":

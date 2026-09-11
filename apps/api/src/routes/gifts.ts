@@ -7,7 +7,7 @@ import { businessAccount, registerGiftCampaign } from "../lib/chain.js";
 import { env } from "../lib/env.js";
 import { findOrCreateUser, mintGiftAndRecord } from "../agent/reward-agent.js";
 
-const { campaigns, businesses, claims, giftTokenIssuances, wallets } = schema;
+const { campaigns, businesses, claims, giftTokenIssuances, wallets, worldVerifications } = schema;
 
 const WELCOME_NAME = "DYNEXA Welcome";
 
@@ -30,7 +30,7 @@ export async function giftRoutes(app: FastifyInstance) {
     const withNames = await Promise.all(
       rows.map(async (r) => {
         const c = await db.query.campaigns.findFirst({ where: eq(campaigns.id, r.campaignId) });
-        return { ...r, campaignName: c?.name ?? "Gift" };
+        return { ...r, campaignName: c?.name ?? "Gift", transferable: c?.giftTransferable ?? false };
       }),
     );
     return withNames;
@@ -55,6 +55,12 @@ export async function giftRoutes(app: FastifyInstance) {
       where: and(eq(claims.campaignId, campaign.id), eq(claims.userId, user.id)),
     });
     if (existing) return { alreadyGranted: true };
+
+    // The welcome gift unlocks with the first World check, not before.
+    const verified = await db.query.worldVerifications.findFirst({
+      where: eq(worldVerifications.userId, user.id),
+    });
+    if (!verified) return { granted: false, needsVerification: true };
 
     const [claim] = await db
       .insert(claims)
@@ -100,6 +106,7 @@ async function ensureWelcomeCampaign() {
       maxUsesPerHuman: 1,
       giftTokenId: Number(r.giftCampaignId),
       qualifyCondition: "Welcome gift on sign-up",
+      giftTransferable: true,
     })
     .returning();
   return campaign;

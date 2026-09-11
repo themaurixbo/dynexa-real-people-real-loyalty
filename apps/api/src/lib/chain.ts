@@ -1,6 +1,7 @@
 import {
   createPublicClient,
   createWalletClient,
+  decodeEventLog,
   defineChain,
   formatUnits,
   http,
@@ -111,6 +112,19 @@ export const giftTokenAbi = [
   { type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ name: "a", type: "address" }, { name: "id", type: "uint256" }], outputs: [{ type: "uint256" }] },
   { type: "function", name: "redeemed", stateMutability: "view", inputs: [{ type: "uint256" }], outputs: [{ type: "bool" }] },
   {
+    type: "function",
+    name: "safeTransferFrom",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "from", type: "address" },
+      { name: "to", type: "address" },
+      { name: "id", type: "uint256" },
+      { name: "value", type: "uint256" },
+      { name: "data", type: "bytes" },
+    ],
+    outputs: [],
+  },
+  {
     type: "event",
     name: "GiftMinted",
     inputs: [
@@ -118,6 +132,17 @@ export const giftTokenAbi = [
       { name: "campaignId", type: "uint256", indexed: true },
       { name: "to", type: "address", indexed: true },
       { name: "claimId", type: "bytes32", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "TransferSingle",
+    inputs: [
+      { name: "operator", type: "address", indexed: true },
+      { name: "from", type: "address", indexed: true },
+      { name: "to", type: "address", indexed: true },
+      { name: "id", type: "uint256", indexed: false },
+      { name: "value", type: "uint256", indexed: false },
     ],
   },
 ] as const;
@@ -157,7 +182,103 @@ export const erc20Abi = [
   { type: "function", name: "approve", stateMutability: "nonpayable", inputs: [{ name: "s", type: "address" }, { name: "a", type: "uint256" }], outputs: [{ type: "bool" }] },
   { type: "function", name: "transfer", stateMutability: "nonpayable", inputs: [{ name: "to", type: "address" }, { name: "a", type: "uint256" }], outputs: [{ type: "bool" }] },
   { type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ name: "a", type: "address" }], outputs: [{ type: "uint256" }] },
+  {
+    type: "event",
+    name: "Transfer",
+    inputs: [
+      { name: "from", type: "address", indexed: true },
+      { name: "to", type: "address", indexed: true },
+      { name: "value", type: "uint256", indexed: false },
+    ],
+  },
 ] as const;
+
+/**
+ * P2P gift links: the sender's own wallet moves USDC to this address first
+ * (the deployer/business key — same one that manages campaign treasuries),
+ * then the friend claims it out to their own wallet.
+ */
+export const transferEscrow = businessAccount.address;
+
+/** Confirms a claimed on-chain USDC transfer really moved `amount` from → to. */
+export async function verifyUsdcTransfer(
+  txHash: `0x${string}`,
+  expected: { from: `0x${string}`; to: `0x${string}`; amount: bigint },
+): Promise<boolean> {
+  const receipt = await publicClient.getTransactionReceipt({ hash: txHash });
+  if (receipt.status !== "success") return false;
+  for (const log of receipt.logs) {
+    if (log.address.toLowerCase() !== env.arcUsdc.toLowerCase()) continue;
+    try {
+      const decoded = decodeEventLog({
+        abi: erc20Abi,
+        data: log.data,
+        topics: log.topics,
+        eventName: "Transfer",
+      });
+      if (
+        decoded.args.from.toLowerCase() === expected.from.toLowerCase() &&
+        decoded.args.to.toLowerCase() === expected.to.toLowerCase() &&
+        decoded.args.value === expected.amount
+      ) {
+        return true;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return false;
+}
+
+/** Sends USDC out of the escrow to whoever claims a gift link. */
+export async function sendUsdc(to: `0x${string}`, amount: bigint) {
+  return send(
+    walletClient.writeContract({ address: env.arcUsdc, abi: erc20Abi, functionName: "transfer", args: [to, amount] }),
+  );
+}
+
+/** Confirms a holder really moved one GiftToken to the escrow, on-chain. */
+export async function verifyGiftTransfer(
+  txHash: `0x${string}`,
+  giftToken: `0x${string}`,
+  expected: { tokenId: bigint; from: `0x${string}`; to: `0x${string}` },
+): Promise<boolean> {
+  const receipt = await publicClient.getTransactionReceipt({ hash: txHash });
+  if (receipt.status !== "success") return false;
+  for (const log of receipt.logs) {
+    if (log.address.toLowerCase() !== giftToken.toLowerCase()) continue;
+    try {
+      const decoded = decodeEventLog({
+        abi: giftTokenAbi,
+        data: log.data,
+        topics: log.topics,
+        eventName: "TransferSingle",
+      });
+      if (
+        decoded.args.from.toLowerCase() === expected.from.toLowerCase() &&
+        decoded.args.to.toLowerCase() === expected.to.toLowerCase() &&
+        decoded.args.id === expected.tokenId
+      ) {
+        return true;
+      }
+    } catch {
+      continue;
+    }
+  }
+  return false;
+}
+
+/** Moves one GiftToken out of escrow to whoever claims a gift-token link. */
+export async function transferGiftFromEscrow(giftToken: `0x${string}`, tokenId: bigint, to: `0x${string}`) {
+  return send(
+    walletClient.writeContract({
+      address: giftToken,
+      abi: giftTokenAbi,
+      functionName: "safeTransferFrom",
+      args: [businessAccount.address, to, tokenId, 1n, "0x"],
+    }),
+  );
+}
 
 export async function treasuryBalance(treasury: `0x${string}`) {
   return publicClient.readContract({ address: treasury, abi: treasuryAbi, functionName: "balance" });

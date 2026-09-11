@@ -32,6 +32,7 @@ export const campaignStatus = pgEnum("campaign_status", [
   "closed",
 ]);
 export const rewardType = pgEnum("reward_type", ["receipt", "selfie", "referral"]);
+export const campaignCategory = pgEnum("campaign_category", ["shopping", "food", "events"]);
 export const rewardMode = pgEnum("reward_mode", ["usdc", "gift"]);
 export const claimStatus = pgEnum("claim_status", [
   "pending",
@@ -105,6 +106,9 @@ export const campaigns = pgTable("campaigns", {
   status: campaignStatus("status").notNull().default("draft"),
   rewardType: rewardType("reward_type").notNull().default("receipt"),
   rewardMode: rewardMode("reward_mode").notNull().default("usdc"),
+  category: campaignCategory("category").notNull().default("shopping"),
+  referenceImages: jsonb("reference_images").$type<string[]>().default([]),
+  giftTransferable: boolean("gift_transferable").notNull().default(false),
   treasuryAddress: text("treasury_address"),
   agentSignerAddress: text("agent_signer_address"),
   totalBudgetUsdc: usdc("total_budget_usdc").notNull(),
@@ -179,11 +183,27 @@ export const claims = pgTable(
     cashAmountUsdc: usdc("cash_amount_usdc"),
     giftTokenId: bigint("gift_token_id", { mode: "number" }),
     onchainClaimId: text("onchain_claim_id"),
+    referredByLinkId: uuid("referred_by_link_id"),
     createdAt: createdAt(),
     decidedAt: timestamp("decided_at", { withTimezone: true }),
   },
   (t) => [index("claims_campaign_user_idx").on(t.campaignId, t.userId)],
 );
+
+// --- referrals ---
+
+/** A referrer's shareable link for one campaign. Referred + referrer both get paid on a valid claim. */
+export const referralLinks = pgTable("referral_links", {
+  id: id(),
+  campaignId: uuid("campaign_id")
+    .notNull()
+    .references(() => campaigns.id),
+  referrerUserId: uuid("referrer_user_id")
+    .notNull()
+    .references(() => users.id),
+  code: text("code").notNull().unique(),
+  createdAt: createdAt(),
+});
 
 export const aiDecisions = pgTable("ai_decisions", {
   id: id(),
@@ -275,6 +295,47 @@ export const redemptions = pgTable("redemptions", {
   reason: text("reason"),
   txId: uuid("tx_id").references(() => blockchainTransactions.id),
   createdAt: createdAt(),
+});
+
+// --- peer-to-peer USDC gift links ---
+
+export const p2pTransferStatus = pgEnum("p2p_transfer_status", [
+  "pending",
+  "claimed",
+  "canceled",
+]);
+export const p2pTransferKind = pgEnum("p2p_transfer_kind", ["usdc", "gift"]);
+
+/**
+ * A customer sends USDC — or one of their own GiftTokens — to the DYNEXA
+ * escrow wallet, gets a share link (e.g. WhatsApp), and a friend claims it
+ * into their own wallet, created on the spot if they don't have one. Escrow
+ * is the deployer/business key, same one that manages campaign treasuries.
+ */
+export const p2pTransfers = pgTable("p2p_transfers", {
+  id: id(),
+  code: text("code").notNull().unique(),
+  kind: p2pTransferKind("kind").notNull().default("usdc"),
+  fromUserId: uuid("from_user_id").references(() => users.id),
+  fromAddress: text("from_address").notNull(),
+  toUserId: uuid("to_user_id").references(() => users.id),
+  toAddress: text("to_address"),
+  toContact: text("to_contact"),
+  amountUsdc: usdc("amount_usdc"),
+  giftTokenId: bigint("gift_token_id", { mode: "number" }),
+  giftIssuanceId: uuid("gift_issuance_id"),
+  note: text("note"),
+  status: p2pTransferStatus("status").notNull().default("pending"),
+  fromTxHash: text("from_tx_hash").notNull(),
+  toTxHash: text("to_tx_hash"),
+  createdAt: createdAt(),
+  claimedAt: timestamp("claimed_at", { withTimezone: true }),
+});
+
+/** Single row, id "global". Kill switch stops every automatic payout platform-wide. */
+export const platformSettings = pgTable("platform_settings", {
+  id: text("id").primaryKey().default("global"),
+  paused: boolean("paused").notNull().default(false),
 });
 
 // --- audit & idempotency ---

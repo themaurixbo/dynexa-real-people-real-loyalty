@@ -1,4 +1,4 @@
-import { createPublicClient, defineChain, formatUnits, http } from "viem";
+import { createPublicClient, defineChain, encodeFunctionData, formatUnits, http, parseUnits } from "viem";
 
 export const arcTestnet = defineChain({
   id: 5042002,
@@ -9,8 +9,48 @@ export const arcTestnet = defineChain({
   testnet: true,
 });
 
-const USDC = "0x3600000000000000000000000000000000000000" as const;
+export const USDC = "0x3600000000000000000000000000000000000000" as const;
 const client = createPublicClient({ chain: arcTestnet, transport: http() });
+
+/** Calldata for a plain `transfer(to, amount)` call, used to send USDC ourselves. */
+export function usdcTransferData(to: string, amountUsdc: string): `0x${string}` {
+  return encodeFunctionData({
+    abi: [
+      {
+        type: "function",
+        name: "transfer",
+        stateMutability: "nonpayable",
+        inputs: [{ name: "to", type: "address" }, { name: "amount", type: "uint256" }],
+        outputs: [{ type: "bool" }],
+      },
+    ],
+    functionName: "transfer",
+    args: [to as `0x${string}`, parseUnits(amountUsdc, 6)],
+  });
+}
+
+/** Calldata for `safeTransferFrom`, used to send one of our own GiftTokens to the escrow. */
+export function giftTransferData(from: string, to: string, tokenId: number): `0x${string}` {
+  return encodeFunctionData({
+    abi: [
+      {
+        type: "function",
+        name: "safeTransferFrom",
+        stateMutability: "nonpayable",
+        inputs: [
+          { name: "from", type: "address" },
+          { name: "to", type: "address" },
+          { name: "id", type: "uint256" },
+          { name: "value", type: "uint256" },
+          { name: "data", type: "bytes" },
+        ],
+        outputs: [],
+      },
+    ],
+    functionName: "safeTransferFrom",
+    args: [from as `0x${string}`, to as `0x${string}`, BigInt(tokenId), 1n, "0x"],
+  });
+}
 
 export async function usdcBalance(address: string): Promise<string> {
   try {

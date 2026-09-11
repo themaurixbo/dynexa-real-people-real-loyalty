@@ -17,6 +17,7 @@ const claimBody = z.object({
   evidenceUrl: z.string().url().optional(),
   evidenceText: z.string().optional(),
   receiptRef: z.string().min(1),
+  referralCode: z.string().optional(),
 });
 
 export async function claimRoutes(app: FastifyInstance) {
@@ -31,10 +32,17 @@ export async function claimRoutes(app: FastifyInstance) {
   });
 
   app.get("/claims", async (req) => {
-    const { campaignId } = z
-      .object({ campaignId: z.string().uuid().optional() })
+    const { campaignId, status } = z
+      .object({
+        campaignId: z.string().uuid().optional(),
+        status: z.enum(["pending", "approved", "rejected", "paid", "failed"]).optional(),
+      })
       .parse(req.query);
-    const where = campaignId ? eq(claims.campaignId, campaignId) : undefined;
+    const conditions = [
+      campaignId ? eq(claims.campaignId, campaignId) : undefined,
+      status ? eq(claims.status, status) : undefined,
+    ].filter((c): c is NonNullable<typeof c> => Boolean(c));
+    const where = conditions.length ? and(...conditions) : undefined;
     return db.select().from(claims).where(where).orderBy(desc(claims.createdAt));
   });
 
@@ -73,5 +81,23 @@ export async function claimRoutes(app: FastifyInstance) {
         : keccak256(toHex("manual-approval")),
     });
     return { status: "paid", txHash };
+  });
+
+  // Business rejects a claim that was over the auto-approval amount.
+  app.post("/claims/:id/reject", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { reason } = z.object({ reason: z.string().default("Rejected by the business.") }).parse(
+      req.body ?? {},
+    );
+    const claim = await db.query.claims.findFirst({ where: eq(claims.id, id) });
+    if (!claim) return reply.code(404).send({ error: "not found" });
+    if (claim.status !== "pending") {
+      return reply.code(409).send({ error: `claim is ${claim.status}` });
+    }
+    await db
+      .update(claims)
+      .set({ status: "rejected", rejectionReason: reason, decidedAt: new Date() })
+      .where(eq(claims.id, id));
+    return { status: "rejected", reason };
   });
 }

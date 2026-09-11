@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+
 export function Card({
   children,
   style,
@@ -124,5 +128,36 @@ export function Amount({ value, unit = "USDC" }: { value: string | number; unit?
         {unit}
       </span>
     </span>
+  );
+}
+
+/** Friendly message for the customer, with the raw error tucked behind "See details". */
+export function ErrorNote({ message }: { message: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{ marginTop: 8 }}>
+      <p style={{ color: "#ff8a8a", fontSize: 12.5 }}>
+        Something didn't go through. Please try again in a moment.
+      </p>
+      <button
+        onClick={() => setOpen((o: boolean) => !o)}
+        style={{
+          background: "none",
+          border: "none",
+          color: "var(--muted)",
+          fontSize: 11,
+          textDecoration: "underline",
+          cursor: "pointer",
+          padding: 0,
+        }}
+      >
+        {open ? "Hide details" : "See details"}
+      </button>
+      {open && (
+        <p className="num" style={{ color: "var(--muted)", fontSize: 11, marginTop: 4, wordBreak: "break-word" }}>
+          {message}
+        </p>
+      )}
+    </div>
   );
 }

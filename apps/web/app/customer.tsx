@@ -4,11 +4,36 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { api, type Campaign, type ClaimResult } from "../lib/api";
 import { usdcBalance } from "../lib/chain";
-import { Amount, Card, Logo, Partner, TxLink } from "./ui";
+import { fileToDataUrl } from "../lib/image";
+import { Amount, Card, ErrorNote, Logo, Partner, TxLink } from "./ui";
 import { TrackLoader } from "./loader";
+import { ClaimGiftCard, ClaimGiftTokenCard, GiftShareModal, ReferralModal, SendModal } from "./send";
 import { WorldVerify, useWorldStatus } from "./world";
 
-type Gift = { id: string; tokenId: number; code: string; status: string; campaignName: string };
+type Gift = {
+  id: string;
+  tokenId: number;
+  code: string;
+  status: string;
+  campaignId: string;
+  campaignName: string;
+  transferable: boolean;
+};
+
+const CATEGORIES = ["all", "shopping", "food", "events"] as const;
+type Category = (typeof CATEGORIES)[number];
+const CATEGORY_LABEL: Record<Category, string> = {
+  all: "All",
+  shopping: "Shopping",
+  food: "Food",
+  events: "Events",
+};
+
+function clearParam(name: string) {
+  const url = new URL(window.location.href);
+  url.searchParams.delete(name);
+  window.history.replaceState(null, "", url.pathname + url.search);
+}
 
 export function CustomerApp() {
   const { ready, authenticated, login, user } = usePrivy();
@@ -17,10 +42,32 @@ export function CustomerApp() {
     () => wallets.find((w) => w.walletClientType === "privy") ?? wallets[0],
     [wallets],
   );
+  const [giftCode, setGiftCode] = useState<string | null>(null);
+  const [giftTokenCode, setGiftTokenCode] = useState<string | null>(null);
+  const [referralCode, setReferralCode] = useState<string | null>(null);
+  const [referralCampaignId, setReferralCampaignId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const gift = params.get("gift");
+    const giftToken = params.get("gift-token");
+    const ref = params.get("ref");
+    if (gift) setGiftCode(gift.toUpperCase());
+    if (giftToken) setGiftTokenCode(giftToken.toUpperCase());
+    if (ref) {
+      const code = ref.toUpperCase();
+      setReferralCode(code);
+      api
+        .referralLinkInfo(code)
+        .then((r) => setReferralCampaignId(r.campaignId))
+        .catch(() => {});
+    }
+  }, []);
 
   if (!ready) return <p style={{ color: "var(--muted)" }}>Loading…</p>;
 
   if (!authenticated) {
+    const hasInvite = giftCode || giftTokenCode || referralCode;
     return (
       <div style={{ textAlign: "center", padding: "48px 4px 0" }}>
         <Logo size={72} />
@@ -30,6 +77,20 @@ export function CustomerApp() {
         <p style={{ color: "var(--muted)", maxWidth: 300, margin: "0 auto 28px", lineHeight: 1.5 }}>
           Real rewards for real, human-verified people. No wallet setup, no seed phrase.
         </p>
+        {hasInvite && (
+          <p
+            style={{
+              fontSize: 13,
+              fontWeight: 700,
+              margin: "0 auto 16px",
+              color: "var(--magenta)",
+            }}
+          >
+            {giftCode || giftTokenCode
+              ? "🎁 Someone sent you a gift — sign in to claim it"
+              : "🔗 You were invited — sign in to see the reward"}
+          </p>
+        )}
         <button className="btn-primary" onClick={login}>
           Continue with email or phone
         </button>
@@ -65,16 +126,56 @@ export function CustomerApp() {
     );
   }
 
-  return <Home wallet={wallet.address} contact={contact} />;
+  return (
+    <Home
+      wallet={wallet.address}
+      contact={contact}
+      giftCode={giftCode}
+      onGiftHandled={() => {
+        setGiftCode(null);
+        clearParam("gift");
+      }}
+      giftTokenCode={giftTokenCode}
+      onGiftTokenHandled={() => {
+        setGiftTokenCode(null);
+        clearParam("gift-token");
+      }}
+      referralCode={referralCode}
+      referralCampaignId={referralCampaignId}
+    />
+  );
 }
 
-function Home({ wallet, contact }: { wallet?: string; contact: string }) {
+function Home({
+  wallet,
+  contact,
+  giftCode,
+  onGiftHandled,
+  giftTokenCode,
+  onGiftTokenHandled,
+  referralCode,
+  referralCampaignId,
+}: {
+  wallet?: string;
+  contact: string;
+  giftCode?: string | null;
+  onGiftHandled?: () => void;
+  giftTokenCode?: string | null;
+  onGiftTokenHandled?: () => void;
+  referralCode?: string | null;
+  referralCampaignId?: string | null;
+}) {
   const [tab, setTab] = useState<"home" | "wallet" | "gifts" | "profile">("home");
   const { verified, setVerified } = useWorldStatus(wallet);
   const [balance, setBalance] = useState<string | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [category, setCategory] = useState<Category>("all");
   const [gifts, setGifts] = useState<Gift[]>([]);
   const [claiming, setClaiming] = useState<Campaign | null>(null);
+  const [referring, setReferring] = useState<Campaign | null>(null);
+  const [sending, setSending] = useState(false);
+  const [gifting, setGifting] = useState<Gift | null>(null);
+  const [welcomeGift, setWelcomeGift] = useState<{ code?: string; txHash?: string } | null>(null);
 
   const load = useCallback(() => {
     if (!wallet) return;
@@ -88,15 +189,54 @@ function Home({ wallet, contact }: { wallet?: string; contact: string }) {
       .catch(() => {});
   }, [wallet]);
 
+  const grantWelcome = useCallback(() => {
+    if (!wallet || !contact) return;
+    api
+      .welcome(contact, wallet)
+      .then((r) => {
+        if (r.granted) {
+          setWelcomeGift({ code: r.code, txHash: r.txHash });
+          load();
+        }
+      })
+      .catch(() => {});
+  }, [wallet, contact, load]);
+
   useEffect(() => {
     load();
-    if (wallet && contact) api.welcome(contact, wallet).then(load).catch(() => {});
-  }, [wallet, contact, load]);
+    grantWelcome();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wallet, contact]);
+
+  const filteredCampaigns = campaigns.filter((c) => category === "all" || c.category === category);
 
   return (
     <div style={{ paddingBottom: 88 }}>
       {(tab === "home" || tab === "wallet") && (
         <section style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+          {tab === "home" && giftCode && wallet && (
+            <ClaimGiftCard
+              code={giftCode}
+              wallet={wallet}
+              contact={contact}
+              onClaimed={() => {
+                onGiftHandled?.();
+                load();
+              }}
+            />
+          )}
+          {tab === "home" && giftTokenCode && wallet && (
+            <ClaimGiftTokenCard
+              code={giftTokenCode}
+              wallet={wallet}
+              contact={contact}
+              onClaimed={() => {
+                onGiftTokenHandled?.();
+                load();
+              }}
+            />
+          )}
+
           {verified ? (
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <span className="pill pill-verified">✓ Human Verified</span>
@@ -107,9 +247,16 @@ function Home({ wallet, contact }: { wallet?: string; contact: string }) {
               <div style={{ fontWeight: 700, marginBottom: 4 }}>One quick check</div>
               <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 10 }}>
                 Before your first reward, confirm you are a real person. Takes a few
-                seconds, no personal data is stored.
+                seconds, no personal data is stored. This also unlocks your welcome gift.
               </p>
-              <WorldVerify contact={contact} wallet={wallet} onVerified={() => setVerified(true)} />
+              <WorldVerify
+                contact={contact}
+                wallet={wallet}
+                onVerified={() => {
+                  setVerified(true);
+                  grantWelcome();
+                }}
+              />
             </Card>
           ) : null}
 
@@ -118,8 +265,17 @@ function Home({ wallet, contact }: { wallet?: string; contact: string }) {
               <div className="label">Available balance</div>
               <Partner name="Privy" />
             </div>
-            <div style={{ marginTop: 8 }}>
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 8 }}>
               <Amount value={balance ?? "—"} />
+              {wallet && (
+                <button
+                  className="btn-ghost"
+                  style={{ fontSize: 12, padding: "8px 12px" }}
+                  onClick={() => setSending(true)}
+                >
+                  Send to a friend
+                </button>
+              )}
             </div>
             <div
               style={{
@@ -141,6 +297,10 @@ function Home({ wallet, contact }: { wallet?: string; contact: string }) {
         </section>
       )}
 
+      {sending && wallet && (
+        <SendModal wallet={wallet} contact={contact} onClose={() => setSending(false)} />
+      )}
+
       {(tab === "home" || tab === "gifts") && (
         <section style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 20 }}>
           <div className="label">Your gifts</div>
@@ -155,32 +315,7 @@ function Home({ wallet, contact }: { wallet?: string; contact: string }) {
             }}
           >
             {gifts.map((g) => (
-              <div className="glass" key={g.id} style={{ opacity: g.status === "redeemed" ? 0.45 : 1 }}>
-                <div className="glassin" style={{ padding: 14, textAlign: "center" }}>
-                  <div style={{ fontSize: 22 }}>🎁</div>
-                  <div style={{ fontSize: 12.5, fontWeight: 700, marginTop: 4 }}>
-                    {g.campaignName}
-                  </div>
-                  <div className="num" style={{ fontSize: 10.5, color: "var(--muted)", marginTop: 2 }}>
-                    #{g.tokenId} · {g.status}
-                  </div>
-                  {g.status !== "redeemed" && (
-                    <div
-                      className="num"
-                      style={{
-                        marginTop: 8,
-                        fontSize: 11,
-                        letterSpacing: 0.5,
-                        background: "rgba(255,255,255,0.06)",
-                        borderRadius: 8,
-                        padding: "5px 4px",
-                      }}
-                    >
-                      {g.code}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <FlippableGiftCard key={g.id} gift={g} onGiftThis={() => setGifting(g)} />
             ))}
           </div>
         </section>
@@ -189,29 +324,46 @@ function Home({ wallet, contact }: { wallet?: string; contact: string }) {
       {tab === "home" && (
         <section style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 20 }}>
           <div className="label">Available rewards</div>
-          {campaigns.length === 0 && (
+          <div className="mode-switch" style={{ alignSelf: "flex-start" }}>
+            {CATEGORIES.map((c) => (
+              <button
+                key={c}
+                className={`mode-tab ${category === c ? "active" : ""}`}
+                onClick={() => setCategory(c)}
+              >
+                {CATEGORY_LABEL[c]}
+              </button>
+            ))}
+          </div>
+          {filteredCampaigns.length === 0 && (
             <p style={{ color: "var(--muted)", fontSize: 13 }}>No active campaigns right now.</p>
           )}
-          {campaigns.map((c) => (
-            <Card key={c.id}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
-                <div style={{ fontWeight: 700, fontSize: 15 }}>{c.name}</div>
-                <Partner name={c.rewardMode === "usdc" ? "Arc" : "Arc"} />
-              </div>
-              <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
-                {c.rewardMode === "usdc" ? `${Number(c.rewardPerUserUsdc)} USDC` : "A branded gift"} ·
-                up to {c.maxUsesPerHuman} per person
-              </div>
-              <p style={{ fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>{c.qualifyCondition}</p>
-              <button
-                className="btn-primary"
-                style={{ marginTop: 14 }}
-                onClick={() => setClaiming(c)}
-              >
-                Claim reward
-              </button>
-            </Card>
-          ))}
+          {filteredCampaigns.map((c) => {
+            const isMyInvite = c.rewardType === "referral" && referralCampaignId === c.id;
+            const isReferralHome = c.rewardType === "referral" && !isMyInvite;
+            return (
+              <Card key={c.id}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>{c.name}</div>
+                  <Partner name="Arc" />
+                </div>
+                <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
+                  {c.rewardMode === "usdc" ? `${Number(c.rewardPerUserUsdc)} USDC` : "A branded gift"} ·
+                  up to {c.maxUsesPerHuman} per person
+                  {c.rewardType === "selfie" ? " · selfie required" : ""}
+                  {c.rewardType === "referral" ? " · refer a friend" : ""}
+                </div>
+                <p style={{ fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>{c.qualifyCondition}</p>
+                <button
+                  className="btn-primary"
+                  style={{ marginTop: 14 }}
+                  onClick={() => (isReferralHome ? setReferring(c) : setClaiming(c))}
+                >
+                  {isReferralHome ? "Get my referral link" : "Claim reward"}
+                </button>
+              </Card>
+            );
+          })}
         </section>
       )}
 
@@ -235,6 +387,7 @@ function Home({ wallet, contact }: { wallet?: string; contact: string }) {
           campaign={claiming}
           contact={contact}
           wallet={wallet}
+          referralCode={referralCampaignId === claiming.id ? (referralCode ?? undefined) : undefined}
           onClose={() => {
             setClaiming(null);
             load();
@@ -242,7 +395,148 @@ function Home({ wallet, contact }: { wallet?: string; contact: string }) {
         />
       )}
 
+      {referring && wallet && (
+        <ReferralModal
+          campaignId={referring.id}
+          wallet={wallet}
+          contact={contact}
+          onClose={() => setReferring(null)}
+        />
+      )}
+
+      {gifting && wallet && (
+        <GiftShareModal
+          issuanceId={gifting.id}
+          tokenId={gifting.tokenId}
+          wallet={wallet}
+          contact={contact}
+          onClose={() => setGifting(null)}
+          onSent={load}
+        />
+      )}
+
+      {welcomeGift && (
+        <WelcomeGiftModal onClose={() => setWelcomeGift(null)} txHash={welcomeGift.txHash} />
+      )}
+
       <BottomNav tab={tab} setTab={setTab} />
+    </div>
+  );
+}
+
+function WelcomeGiftModal({ onClose, txHash }: { onClose: () => void; txHash?: string }) {
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.65)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+        zIndex: 70,
+      }}
+    >
+      <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 340 }}>
+        <Card>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: 44 }}>🎉</div>
+            <div style={{ fontWeight: 700, fontSize: 18, margin: "8px 0 4px" }}>Welcome gift unlocked!</div>
+            <p style={{ fontSize: 13, color: "var(--muted)" }}>
+              Thanks for verifying you're a real person. Check your Gifts tab.
+            </p>
+            <TxLink hash={txHash} />
+            <button className="btn-primary" style={{ marginTop: 14 }} onClick={onClose}>
+              Nice!
+            </button>
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function FlippableGiftCard({ gift, onGiftThis }: { gift: Gift; onGiftThis: () => void }) {
+  const [flipped, setFlipped] = useState(false);
+  const redeemed = gift.status === "redeemed";
+  return (
+    <div
+      style={{ perspective: 800, opacity: redeemed ? 0.45 : 1 }}
+      onClick={() => !redeemed && setFlipped((f) => !f)}
+    >
+      <div
+        style={{
+          position: "relative",
+          transformStyle: "preserve-3d",
+          transition: "transform 0.5s",
+          transform: flipped ? "rotateY(180deg)" : "none",
+          minHeight: 150,
+          cursor: redeemed ? "default" : "pointer",
+        }}
+      >
+        <div className="glass" style={{ backfaceVisibility: "hidden" }}>
+          <div className="glassin" style={{ padding: 14, textAlign: "center" }}>
+            <div style={{ fontSize: 22 }}>🎁</div>
+            <div style={{ fontSize: 12.5, fontWeight: 700, marginTop: 4 }}>{gift.campaignName}</div>
+            <div className="num" style={{ fontSize: 10.5, color: "var(--muted)", marginTop: 2 }}>
+              #{gift.tokenId} · {gift.status}
+            </div>
+            {!redeemed && <div style={{ fontSize: 10, color: "var(--muted)", marginTop: 6 }}>tap to flip</div>}
+          </div>
+        </div>
+        <div
+          className="glass"
+          style={{
+            position: "absolute",
+            inset: 0,
+            backfaceVisibility: "hidden",
+            transform: "rotateY(180deg)",
+          }}
+        >
+          <div className="glassin" style={{ padding: 12, textAlign: "center" }}>
+            {!redeemed ? (
+              <>
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(gift.code)}`}
+                  alt="QR"
+                  width={64}
+                  height={64}
+                  style={{ borderRadius: 6, background: "#fff", padding: 3 }}
+                />
+                <div
+                  className="num"
+                  style={{
+                    marginTop: 6,
+                    fontSize: 10.5,
+                    letterSpacing: 0.5,
+                    background: "rgba(255,255,255,0.06)",
+                    borderRadius: 8,
+                    padding: "4px 4px",
+                  }}
+                >
+                  {gift.code}
+                </div>
+                {gift.transferable && (
+                  <button
+                    className="btn-ghost"
+                    style={{ marginTop: 6, fontSize: 10.5, padding: "6px 8px", width: "100%" }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onGiftThis();
+                    }}
+                  >
+                    Gift this
+                  </button>
+                )}
+              </>
+            ) : (
+              <div style={{ fontSize: 12, color: "var(--muted)" }}>Redeemed</div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -314,19 +608,43 @@ function ClaimModal({
   campaign,
   contact,
   wallet,
+  referralCode,
   onClose,
 }: {
   campaign: Campaign;
   contact: string;
   wallet?: string;
+  referralCode?: string;
   onClose: () => void;
 }) {
-  const [evidence, setEvidence] = useState("");
+  const isSelfie = campaign.rewardType === "selfie";
+  const [note, setNote] = useState("");
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [socialLink, setSocialLink] = useState("");
+  const [useLink, setUseLink] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ClaimResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  async function onPickPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setPhotoError(null);
+    try {
+      setPhoto(await fileToDataUrl(file));
+    } catch (err) {
+      setPhotoError((err as Error).message);
+    }
+  }
+
   async function submit() {
+    const evidenceUrl = useLink ? socialLink.trim() : photo;
+    if (!evidenceUrl) {
+      setError(useLink ? "Paste a link to your post first." : "Add a photo first.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -335,8 +653,10 @@ function ClaimModal({
           campaignId: campaign.id,
           contact,
           customerAddress: wallet,
-          evidenceText: evidence || "receipt photo",
+          evidenceUrl,
+          evidenceText: note || undefined,
           receiptRef: `${contact}-${Date.now()}`,
+          referralCode,
         }),
       );
     } catch (e) {
@@ -350,14 +670,14 @@ function ClaimModal({
     campaign.rewardMode === "gift"
       ? [
           { brand: "World" as const, label: "Checking you are a real, unique person" },
-          { brand: "DYNEXA" as const, label: "The agent reviews your proof of purchase" },
+          { brand: "DYNEXA" as const, label: "The agent reviews your proof" },
           { brand: "DYNEXA" as const, label: "Applying the campaign's rules and limits" },
           { brand: "Circle" as const, label: "The Circle Agent Wallet mints your gift" },
           { brand: "Arc" as const, label: "Confirming the GiftToken on Arc" },
         ]
       : [
           { brand: "World" as const, label: "Checking you are a real, unique person" },
-          { brand: "DYNEXA" as const, label: "The agent reviews your proof of purchase" },
+          { brand: "DYNEXA" as const, label: "The agent reviews your proof" },
           { brand: "DYNEXA" as const, label: "Applying the campaign's rules and limits" },
           { brand: "Circle" as const, label: "The Circle Agent Wallet sends your reward" },
           { brand: "Arc" as const, label: "Confirming the USDC payment on Arc" },
@@ -386,21 +706,103 @@ function ClaimModal({
               <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 12 }}>
                 {campaign.qualifyCondition}
               </p>
-              <div className="label" style={{ marginBottom: 6 }}>
-                Describe your proof of purchase
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 6,
+                }}
+              >
+                <div className="label">{isSelfie ? "Your selfie with the product" : "Photo of your receipt"}</div>
+                {!isSelfie && (
+                  <button
+                    onClick={() => setUseLink((v) => !v)}
+                    style={{ background: "none", border: "none", color: "var(--magenta)", fontSize: 11, cursor: "pointer" }}
+                  >
+                    {useLink ? "Use a photo instead" : "Paste a social link instead"}
+                  </button>
+                )}
+              </div>
+
+              {useLink && !isSelfie ? (
+                <input
+                  className="field"
+                  value={socialLink}
+                  onChange={(e) => setSocialLink(e.target.value)}
+                  placeholder="https://instagram.com/p/..."
+                />
+              ) : photo ? (
+                <div style={{ position: "relative" }}>
+                  <img
+                    src={photo}
+                    alt={isSelfie ? "Selfie" : "Receipt"}
+                    style={{
+                      width: "100%",
+                      maxHeight: 220,
+                      objectFit: "cover",
+                      borderRadius: 13,
+                      border: "1px solid rgba(255,255,255,0.09)",
+                    }}
+                  />
+                  <button
+                    className="btn-ghost"
+                    style={{ position: "absolute", top: 8, right: 8, padding: "5px 10px", fontSize: 11 }}
+                    onClick={() => setPhoto(null)}
+                  >
+                    Retake
+                  </button>
+                </div>
+              ) : (
+                <label
+                  className="field"
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 6,
+                    padding: "26px 14px",
+                    textAlign: "center",
+                    cursor: "pointer",
+                    color: "var(--muted)",
+                  }}
+                >
+                  <span style={{ fontSize: 22 }}>{isSelfie ? "🤳" : "📷"}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>
+                    {isSelfie ? "Take a selfie holding the product" : "Take or upload a photo"}
+                  </span>
+                  <span style={{ fontSize: 11 }}>
+                    {isSelfie
+                      ? "Front camera text may look mirrored — that's fine"
+                      : "The agent reads it and checks it against the condition"}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    capture={isSelfie ? "user" : "environment"}
+                    onChange={onPickPhoto}
+                    style={{ display: "none" }}
+                  />
+                </label>
+              )}
+              {photoError && <p style={{ color: "#ff8a8a", fontSize: 12, marginTop: 6 }}>{photoError}</p>}
+
+              <div className="label" style={{ marginTop: 12, marginBottom: 6 }}>
+                Anything else to add? (optional)
               </div>
               <textarea
                 className="field"
-                rows={3}
-                value={evidence}
-                onChange={(e) => setEvidence(e.target.value)}
-                placeholder="e.g. receipt from Vacafría for a pistachio cone"
+                rows={2}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="e.g. it's a pistachio ice cream cone"
               />
-              {error && <p style={{ color: "#ff8a8a", fontSize: 12, marginTop: 8 }}>{error}</p>}
+              {error && <ErrorNote message={error} />}
               <button
                 className="btn-primary"
                 style={{ marginTop: 14 }}
-                disabled={busy}
+                disabled={busy || (!photo && !socialLink.trim())}
                 onClick={submit}
               >
                 {busy ? "Working…" : "Submit claim"}

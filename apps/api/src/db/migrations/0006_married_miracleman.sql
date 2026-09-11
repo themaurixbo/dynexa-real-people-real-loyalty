@@ -1,0 +1,1 @@
+ALTER TABLE "campaigns" ADD COLUMN "gift_transferable" boolean DEFAULT false NOT NULL;

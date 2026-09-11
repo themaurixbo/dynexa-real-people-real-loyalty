@@ -3,6 +3,7 @@ import { decodeEventLog, keccak256, toHex } from "viem";
 import { db, schema } from "../db/client.js";
 import { env } from "../lib/env.js";
 import { fromUsdc, giftTokenAbi, publicClient, treasuryBalance, usdc } from "../lib/chain.js";
+import { isPlatformPaused } from "../routes/admin.js";
 import { evaluatePolicy } from "./policy.js";
 import { agentSigner } from "./signer.js";
 import { checkEvidence } from "./verifier.js";
@@ -20,6 +21,7 @@ const {
   giftTokenIssuances,
   blockchainTransactions,
   auditEvents,
+  referralLinks,
 } = schema;
 
 export interface ClaimRequest {
@@ -29,6 +31,7 @@ export interface ClaimRequest {
   evidenceUrl?: string;
   evidenceText?: string;
   receiptRef: string;
+  referralCode?: string;
 }
 
 export interface ClaimResult {
@@ -55,23 +58,56 @@ export async function runRewardClaim(reqBody: ClaimRequest): Promise<ClaimResult
     : keccak256(toHex(`unverified:${user.id}`));
   const receiptHash = keccak256(toHex(reqBody.receiptRef));
 
+  // Referral: resolve the link, but never pay a self-referral.
+  let referral = reqBody.referralCode
+    ? await db.query.referralLinks.findFirst({ where: eq(referralLinks.code, reqBody.referralCode) })
+    : undefined;
+  if (referral && (referral.campaignId !== campaign.id || referral.referrerUserId === user.id)) {
+    referral = undefined;
+  }
+
   // --- gather real signals ---
   const [dup] = await db.select().from(receipts).where(eq(receipts.receiptHash, receiptHash));
-  const [{ value: priorClaims }] = await db
-    .select({ value: count() })
-    .from(claims)
-    .where(
-      and(
-        eq(claims.campaignId, campaign.id),
-        eq(claims.userId, user.id),
-        inArray(claims.status, ["paid", "approved"]),
-      ),
-    );
+  // Count by the verified human (World nullifier), not by account — a new
+  // account can't be used to dodge the per-human limit.
+  let priorClaims = 0;
+  if (verification) {
+    const humans = await db
+      .select({ userId: worldVerifications.userId })
+      .from(worldVerifications)
+      .where(eq(worldVerifications.nullifierHash, verification.nullifierHash));
+    const userIds = humans.map((h) => h.userId);
+    const [row] = await db
+      .select({ value: count() })
+      .from(claims)
+      .where(
+        and(
+          eq(claims.campaignId, campaign.id),
+          inArray(claims.userId, userIds),
+          inArray(claims.status, ["paid", "approved"]),
+        ),
+      );
+    priorClaims = row?.value ?? 0;
+  } else {
+    const [row] = await db
+      .select({ value: count() })
+      .from(claims)
+      .where(
+        and(
+          eq(claims.campaignId, campaign.id),
+          eq(claims.userId, user.id),
+          inArray(claims.status, ["paid", "approved"]),
+        ),
+      );
+    priorClaims = row?.value ?? 0;
+  }
 
   const verdict = await checkEvidence({
     evidenceUrl: reqBody.evidenceUrl,
     evidenceText: reqBody.evidenceText,
     qualifyCondition: campaign.qualifyCondition ?? "",
+    rewardType: campaign.rewardType,
+    referenceImages: campaign.referenceImages ?? undefined,
   });
 
   const amount = usdc(campaign.rewardPerUserUsdc ?? "0");
@@ -80,9 +116,11 @@ export async function runRewardClaim(reqBody: ClaimRequest): Promise<ClaimResult
       ? await treasuryBalance(campaign.treasuryAddress as `0x${string}`)
       : 0n;
   const now = new Date();
+  const platformActive = !(await isPlatformPaused());
 
   const policy = evaluatePolicy({
     rewardMode: campaign.rewardMode,
+    platformActive,
     campaignActive: campaign.status === "active",
     withinDates:
       (!campaign.startsAt || campaign.startsAt <= now) &&
@@ -167,6 +205,7 @@ export async function runRewardClaim(reqBody: ClaimRequest): Promise<ClaimResult
   // --- pass: the agent pays the reward ---
   if (campaign.rewardMode === "gift") {
     const minted = await mintGiftAndRecord(claim.id, campaign, user, { nullifierHash, receiptHash });
+    if (referral) await payReferrer(campaign, referral, claim.id);
     return {
       claimId: claim.id,
       status: "paid",
@@ -178,6 +217,7 @@ export async function runRewardClaim(reqBody: ClaimRequest): Promise<ClaimResult
   }
 
   const paid = await payAndRecord(claim.id, campaign, user, { nullifierHash, receiptHash });
+  if (referral) await payReferrer(campaign, referral, claim.id);
   return {
     claimId: claim.id,
     status: "paid",
@@ -186,6 +226,46 @@ export async function runRewardClaim(reqBody: ClaimRequest): Promise<ClaimResult
     amountUsdc: fromUsdc(amount),
     txHash: paid.txHash,
   };
+}
+
+/**
+ * Referral bonus: the referrer gets the same reward as the person they
+ * brought in, as a second, separate transaction (waited-for, not parallel).
+ */
+async function payReferrer(
+  campaign: typeof schema.campaigns.$inferSelect,
+  referral: typeof schema.referralLinks.$inferSelect,
+  referredClaimId: string,
+) {
+  try {
+    const referrer = await db.query.users.findFirst({ where: eq(users.id, referral.referrerUserId) });
+    if (!referrer) return;
+    const [refClaim] = await db
+      .insert(claims)
+      .values({
+        campaignId: campaign.id,
+        userId: referrer.id,
+        status: "pending",
+        cashAmountUsdc: campaign.rewardPerUserUsdc,
+        referredByLinkId: referral.id,
+      })
+      .returning();
+    const refVerification = await getVerification(referrer.id);
+    const refs = {
+      nullifierHash: refVerification
+        ? keccak256(toHex(refVerification.nullifierHash))
+        : keccak256(toHex(`unverified:${referrer.id}`)),
+      receiptHash: keccak256(toHex(`referral:${referredClaimId}`)),
+    };
+    if (campaign.rewardMode === "gift") {
+      await mintGiftAndRecord(refClaim.id, campaign, referrer, refs);
+    } else {
+      await payAndRecord(refClaim.id, campaign, referrer, refs);
+    }
+    await audit("agent", "referral.paid", "claim", refClaim.id, { referredClaimId });
+  } catch (e) {
+    await audit("agent", "referral.failed", "claim", referredClaimId, { error: (e as Error).message });
+  }
 }
 
 /** Used both by the agent (auto) and by a business approval. */

@@ -1,5 +1,6 @@
+import { randomBytes } from "node:crypto";
 import type { FastifyInstance } from "fastify";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "../db/client.js";
 import {
@@ -15,26 +16,41 @@ import {
 } from "../lib/chain.js";
 import { env } from "../lib/env.js";
 import { agentSigner } from "../agent/signer.js";
+import { findOrCreateUser } from "../agent/reward-agent.js";
 
-const { businesses, campaigns } = schema;
+const { businesses, campaigns, referralLinks } = schema;
 
 const createBody = z.object({
   businessName: z.string().min(1).default("Vacafría"),
   name: z.string().min(1),
+  category: z.enum(["shopping", "food", "events"]).default("shopping"),
   rewardType: z.enum(["receipt", "selfie", "referral"]).default("receipt"),
   rewardMode: z.enum(["usdc", "gift"]).default("usdc"),
   rewardPerUserUsdc: z.string(),
   totalBudgetUsdc: z.string(),
   maxPerTxUsdc: z.string(),
   maxUsesPerHuman: z.number().int().positive().default(1),
+  maxParticipants: z.number().int().positive().optional(),
   requiresApprovalAboveUsdc: z.string().optional(),
   qualifyCondition: z.string().default(""),
   startsAt: z.string().datetime().optional(),
   endsAt: z.string().datetime().optional(),
+  referenceImages: z.array(z.string()).max(4).default([]),
   // gift-mode only
   giftName: z.string().default("Free gift"),
   giftMetadataUri: z.string().default(""),
   giftTransferable: z.boolean().default(false),
+});
+
+const editBody = z.object({
+  qualifyCondition: z.string().optional(),
+  maxUsesPerHuman: z.number().int().positive().optional(),
+  maxParticipants: z.number().int().positive().nullable().optional(),
+  requiresApprovalAboveUsdc: z.string().nullable().optional(),
+  startsAt: z.string().datetime().nullable().optional(),
+  endsAt: z.string().datetime().nullable().optional(),
+  category: z.enum(["shopping", "food", "events"]).optional(),
+  referenceImages: z.array(z.string()).max(4).optional(),
 });
 
 export async function campaignRoutes(app: FastifyInstance) {
@@ -74,6 +90,7 @@ export async function campaignRoutes(app: FastifyInstance) {
         businessId: business.id,
         name: body.name,
         status: "active",
+        category: body.category,
         rewardType: body.rewardType,
         rewardMode: body.rewardMode,
         treasuryAddress: treasury,
@@ -82,11 +99,14 @@ export async function campaignRoutes(app: FastifyInstance) {
         rewardPerUserUsdc: body.rewardPerUserUsdc,
         maxPerTxUsdc: body.maxPerTxUsdc,
         maxUsesPerHuman: body.maxUsesPerHuman,
+        maxParticipants: body.maxParticipants ?? null,
         giftTokenId: giftCampaignId,
         requiresApprovalAboveUsdc: body.requiresApprovalAboveUsdc ?? null,
         qualifyCondition: body.qualifyCondition,
         startsAt: body.startsAt ? new Date(body.startsAt) : null,
         endsAt: body.endsAt ? new Date(body.endsAt) : null,
+        referenceImages: body.referenceImages,
+        giftTransferable: body.giftTransferable,
       })
       .returning();
 
@@ -96,6 +116,11 @@ export async function campaignRoutes(app: FastifyInstance) {
   app.get("/campaigns", async () => {
     const rows = await db.select().from(campaigns).orderBy(desc(campaigns.createdAt));
     return Promise.all(rows.map(withBalance));
+  });
+
+  // Multi-tenancy: which businesses exist, so the dashboard can scope to one.
+  app.get("/businesses", async () => {
+    return db.select().from(businesses).orderBy(desc(businesses.createdAt));
   });
 
   app.get("/campaigns/:id", async (req, reply) => {
@@ -134,6 +159,66 @@ export async function campaignRoutes(app: FastifyInstance) {
     const txHash = await closeTreasury(c.treasuryAddress as `0x${string}`);
     await db.update(campaigns).set({ status: "closed" }).where(eq(campaigns.id, id));
     return { txHash };
+  });
+
+  // Edit the off-chain rules of a campaign. The on-chain per-tx/total limits are
+  // fixed at deploy time by the contract — those aren't editable here.
+  app.patch("/campaigns/:id", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const body = editBody.parse(req.body);
+    const c = await db.query.campaigns.findFirst({ where: eq(campaigns.id, id) });
+    if (!c) return reply.code(404).send({ error: "not found" });
+
+    await db
+      .update(campaigns)
+      .set({
+        ...(body.qualifyCondition !== undefined && { qualifyCondition: body.qualifyCondition }),
+        ...(body.maxUsesPerHuman !== undefined && { maxUsesPerHuman: body.maxUsesPerHuman }),
+        ...(body.maxParticipants !== undefined && { maxParticipants: body.maxParticipants }),
+        ...(body.requiresApprovalAboveUsdc !== undefined && {
+          requiresApprovalAboveUsdc: body.requiresApprovalAboveUsdc,
+        }),
+        ...(body.startsAt !== undefined && { startsAt: body.startsAt ? new Date(body.startsAt) : null }),
+        ...(body.endsAt !== undefined && { endsAt: body.endsAt ? new Date(body.endsAt) : null }),
+        ...(body.category !== undefined && { category: body.category }),
+        ...(body.referenceImages !== undefined && { referenceImages: body.referenceImages }),
+      })
+      .where(eq(campaigns.id, id));
+
+    const updated = await db.query.campaigns.findFirst({ where: eq(campaigns.id, id) });
+    return withBalance(updated!);
+  });
+
+  // A customer's shareable referral link for one campaign — same one every time they ask.
+  app.post("/campaigns/:id/referral-link", async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const { contact, address } = z
+      .object({ contact: z.string().min(3), address: z.string().regex(/^0x[a-fA-F0-9]{40}$/) })
+      .parse(req.body);
+    const campaign = await db.query.campaigns.findFirst({ where: eq(campaigns.id, id) });
+    if (!campaign) return reply.code(404).send({ error: "not found" });
+
+    const user = await findOrCreateUser(contact, address as `0x${string}`);
+    const existing = await db.query.referralLinks.findFirst({
+      where: and(eq(referralLinks.campaignId, id), eq(referralLinks.referrerUserId, user.id)),
+    });
+    if (existing) return { code: existing.code };
+
+    const code = randomBytes(4).toString("hex").toUpperCase();
+    await db.insert(referralLinks).values({ campaignId: id, referrerUserId: user.id, code });
+    return { code };
+  });
+
+  // Lets a new visitor's ?ref=CODE link show which campaign they were invited to.
+  app.get("/referral-links/:code", async (req, reply) => {
+    const { code } = req.params as { code: string };
+    const link = await db.query.referralLinks.findFirst({
+      where: eq(referralLinks.code, code.toUpperCase()),
+    });
+    if (!link) return reply.code(404).send({ error: "not found" });
+    const campaign = await db.query.campaigns.findFirst({ where: eq(campaigns.id, link.campaignId) });
+    if (!campaign) return reply.code(404).send({ error: "not found" });
+    return { code: link.code, campaignId: campaign.id, campaignName: campaign.name };
   });
 }
 
