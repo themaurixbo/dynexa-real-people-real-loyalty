@@ -2,6 +2,36 @@
 
 import { useState } from "react";
 
+/** A ghost button that copies `text` and briefly confirms it did. */
+export function CopyButton({
+  text,
+  label = "Copy link",
+  style,
+}: {
+  text: string;
+  label?: string;
+  style?: React.CSSProperties;
+}) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      className="btn-ghost"
+      style={{ width: "100%", ...style }}
+      onClick={async () => {
+        try {
+          await navigator.clipboard?.writeText(text);
+        } catch {
+          // clipboard blocked (e.g. no permission) — nothing more we can do
+        }
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1600);
+      }}
+    >
+      {copied ? "Copied ✓" : label}
+    </button>
+  );
+}
+
 export function Card({
   children,
   style,
@@ -14,6 +44,51 @@ export function Card({
       <div className="glassin" style={{ padding: 20 }}>
         {children}
       </div>
+    </div>
+  );
+}
+
+/** The premium balance card — gunmetal + gold, floating on a neon shadow. */
+export function WalletCard({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        position: "relative",
+        borderRadius: 24,
+        padding: "28px 22px 22px",
+        minHeight: 176,
+        background:
+          "linear-gradient(155deg, #3a3a42 0%, #232228 32%, #141317 68%, #0a0a0c 100%)",
+        border: "1px solid rgba(224,184,110,0.35)",
+        boxShadow:
+          "0 30px 55px -18px rgba(224,184,110,0.35), 0 14px 30px -8px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.08)",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          right: -30,
+          top: -30,
+          opacity: 0.07,
+          transform: "rotate(-10deg)",
+          pointerEvents: "none",
+        }}
+      >
+        <Logo size={160} />
+      </div>
+      <div
+        aria-hidden
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "linear-gradient(115deg, transparent 40%, rgba(224,184,110,0.10) 50%, transparent 60%)",
+          pointerEvents: "none",
+        }}
+      />
+      <div style={{ position: "relative" }}>{children}</div>
     </div>
   );
 }

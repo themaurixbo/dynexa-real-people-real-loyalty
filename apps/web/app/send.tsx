@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useSendTransaction } from "@privy-io/react-auth";
 import { api, type TransferInfo } from "../lib/api";
 import { USDC, arcTestnet, giftTransferData, usdcBalance, usdcTransferData } from "../lib/chain";
-import { Card, TxLink } from "./ui";
+import { Card, CopyButton, TxLink } from "./ui";
 import { TrackLoader } from "./loader";
 
 /** Turns a raw chain/wallet error into something a customer can read. */
@@ -159,13 +159,7 @@ export function SendModal({
               >
                 Share on WhatsApp
               </a>
-              <button
-                className="btn-ghost"
-                style={{ width: "100%", marginTop: 10 }}
-                onClick={() => navigator.clipboard?.writeText(link)}
-              >
-                Copy link
-              </button>
+              <CopyButton text={link} style={{ marginTop: 10 }} />
               <button className="btn-ghost" style={{ width: "100%", marginTop: 10 }} onClick={onClose}>
                 Done
               </button>
@@ -416,13 +410,7 @@ export function GiftShareModal({
               >
                 Share on WhatsApp
               </a>
-              <button
-                className="btn-ghost"
-                style={{ width: "100%", marginTop: 10 }}
-                onClick={() => navigator.clipboard?.writeText(link)}
-              >
-                Copy link
-              </button>
+              <CopyButton text={link} style={{ marginTop: 10 }} />
               <button className="btn-ghost" style={{ width: "100%", marginTop: 10 }} onClick={onClose}>
                 Done
               </button>
@@ -599,13 +587,7 @@ export function ReferralModal({
                 >
                   Share on WhatsApp
                 </a>
-                <button
-                  className="btn-ghost"
-                  style={{ width: "100%", marginTop: 10 }}
-                  onClick={() => navigator.clipboard?.writeText(link)}
-                >
-                  Copy link
-                </button>
+                <CopyButton text={link} style={{ marginTop: 10 }} />
               </>
             )}
             <button className="btn-ghost" style={{ width: "100%", marginTop: 10 }} onClick={onClose}>
