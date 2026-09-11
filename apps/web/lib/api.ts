@@ -46,6 +46,7 @@ export interface Claim {
   cashAmountUsdc: string | null;
   createdAt: string;
   decidedAt: string | null;
+  txHash?: string;
 }
 
 export interface ClaimResult {

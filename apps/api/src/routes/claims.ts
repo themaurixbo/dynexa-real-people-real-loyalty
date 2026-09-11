@@ -1,11 +1,11 @@
 import type { FastifyInstance } from "fastify";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { keccak256, toHex } from "viem";
 import { z } from "zod";
 import { db, schema } from "../db/client.js";
 import { payAndRecord, runRewardClaim } from "../agent/reward-agent.js";
 
-const { claims, campaigns, users } = schema;
+const { claims, campaigns, users, payouts, giftTokenIssuances, blockchainTransactions } = schema;
 
 const claimBody = z.object({
   campaignId: z.string().uuid(),
@@ -43,7 +43,8 @@ export async function claimRoutes(app: FastifyInstance) {
       status ? eq(claims.status, status) : undefined,
     ].filter((c): c is NonNullable<typeof c> => Boolean(c));
     const where = conditions.length ? and(...conditions) : undefined;
-    return db.select().from(claims).where(where).orderBy(desc(claims.createdAt));
+    const rows = await db.select().from(claims).where(where).orderBy(desc(claims.createdAt));
+    return attachTxHashes(rows);
   });
 
   // Business approves a claim that was over the auto-approval amount.
@@ -100,4 +101,31 @@ export async function claimRoutes(app: FastifyInstance) {
       .where(eq(claims.id, id));
     return { status: "rejected", reason };
   });
+}
+
+/** Adds the on-chain tx hash to each paid claim, for the dashboard's history table. */
+async function attachTxHashes(rows: (typeof claims.$inferSelect)[]) {
+  const ids = rows.map((r) => r.id);
+  if (ids.length === 0) return rows;
+
+  const [payoutRows, giftRows] = await Promise.all([
+    db.select().from(payouts).where(inArray(payouts.claimId, ids)),
+    db.select().from(giftTokenIssuances).where(inArray(giftTokenIssuances.claimId, ids)),
+  ]);
+  const txIds = [
+    ...payoutRows.map((p) => p.txId),
+    ...giftRows.map((g) => g.txId),
+  ].filter((id): id is string => Boolean(id));
+  const txRows = txIds.length
+    ? await db.select().from(blockchainTransactions).where(inArray(blockchainTransactions.id, txIds))
+    : [];
+  const txById = new Map(txRows.map((t) => [t.id, t.hash]));
+  const hashByClaim = new Map<string, string>();
+  for (const p of payoutRows) {
+    if (p.txId && txById.get(p.txId)) hashByClaim.set(p.claimId, txById.get(p.txId)!);
+  }
+  for (const g of giftRows) {
+    if (g.txId && txById.get(g.txId)) hashByClaim.set(g.claimId, txById.get(g.txId)!);
+  }
+  return rows.map((r) => ({ ...r, txHash: hashByClaim.get(r.id) }));
 }

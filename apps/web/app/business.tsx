@@ -680,6 +680,7 @@ function History({ campaignIds, campaigns }: { campaignIds: string[]; campaigns:
             <th style={{ padding: "6px 8px" }}>Amount</th>
             <th style={{ padding: "6px 8px" }}>Reason</th>
             <th style={{ padding: "6px 8px" }}>When</th>
+            <th style={{ padding: "6px 8px" }}>Tx</th>
           </tr>
         </thead>
         <tbody>
@@ -702,6 +703,9 @@ function History({ campaignIds, campaigns }: { campaignIds: string[]; campaigns:
               <td style={{ padding: "8px", color: "var(--muted)" }}>{r.rejectionReason ?? "—"}</td>
               <td style={{ padding: "8px", color: "var(--muted)" }} className="num">
                 {new Date(r.createdAt).toLocaleString()}
+              </td>
+              <td style={{ padding: "8px" }}>
+                <TxLink hash={r.txHash} />
               </td>
             </tr>
           ))}
