@@ -5,7 +5,7 @@ import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { api, type Campaign, type ClaimResult } from "../lib/api";
 import { usdcBalance } from "../lib/chain";
 import { fileToDataUrl } from "../lib/image";
-import { Amount, BrandMark, Card, ErrorNote, Logo, Partner, TxLink } from "./ui";
+import { BrandMark, Card, ErrorNote, Logo, Partner, TxLink, WalletCard } from "./ui";
 import { TrackLoader } from "./loader";
 import { ClaimGiftCard, ClaimGiftTokenCard, GiftShareModal, ReferralModal, SendModal } from "./send";
 import { WorldVerify, useWorldStatus } from "./world";
@@ -301,17 +301,34 @@ function Home({
             </Card>
           ) : null}
 
-          <Card>
+          <WalletCard>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div className="label">Available balance</div>
+              <div
+                className="label"
+                style={{ color: "var(--gold)", letterSpacing: 1.2, display: "flex", alignItems: "center", gap: 7 }}
+              >
+                <Logo size={16} /> Available balance
+              </div>
               <Partner name="Privy" />
             </div>
-            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 8 }}>
-              <Amount value={balance ?? "—"} />
+            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 16 }}>
+              <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
+                <span className="num" style={{ fontSize: 40, fontWeight: 800, color: "var(--gold)" }}>
+                  {balance ?? "—"}
+                </span>
+                <span className="num" style={{ fontSize: 15, fontWeight: 600, color: "var(--muted)" }}>
+                  USDC
+                </span>
+              </span>
               {wallet && (
                 <button
                   className="btn-ghost"
-                  style={{ fontSize: 12, padding: "8px 12px" }}
+                  style={{
+                    fontSize: 12,
+                    padding: "8px 12px",
+                    background: "rgba(224,184,110,0.1)",
+                    borderColor: "rgba(224,184,110,0.35)",
+                  }}
                   onClick={() => setSending(true)}
                 >
                   Send to a friend
@@ -323,7 +340,9 @@ function Home({
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                marginTop: 12,
+                marginTop: 18,
+                paddingTop: 14,
+                borderTop: "1px solid rgba(224,184,110,0.16)",
               }}
             >
               <span
@@ -334,7 +353,7 @@ function Home({
               </span>
               <Partner name="Arc" />
             </div>
-          </Card>
+          </WalletCard>
         </section>
       )}
 
