@@ -5,8 +5,12 @@ const BASE =
     : "http://localhost:4000");
 
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
+  // A POST/PATCH with no body but a JSON content-type header is invalid JSON
+  // as far as the server's concerned ("") — default to an empty object.
+  const needsBody = init?.method && init.method !== "GET" && init.body === undefined;
   const res = await fetch(`${BASE}${path}`, {
     ...init,
+    body: needsBody ? "{}" : init?.body,
     headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
   });
   const body = await res.json().catch(() => ({}));
