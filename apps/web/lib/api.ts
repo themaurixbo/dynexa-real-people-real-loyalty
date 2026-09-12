@@ -169,14 +169,15 @@ export const api = {
   createTransfer: (body: {
     fromAddress: string;
     fromContact?: string;
+    toContact?: string;
     amountUsdc: string;
     fromTxHash: string;
     note?: string;
   }) =>
-    req<{ code: string; amountUsdc: string }>("/transfers", {
-      method: "POST",
-      body: JSON.stringify(body),
-    }),
+    req<{ code: string; amountUsdc: string; autoDelivered?: { toAddress: string; txHash: string } }>(
+      "/transfers",
+      { method: "POST", body: JSON.stringify(body) },
+    ),
   getTransfer: (code: string) => req<TransferInfo>(`/transfers/${code}`),
   claimTransfer: (code: string, address: string, contact?: string) =>
     req<{ status: string; amountUsdc: string; txHash: string }>(`/transfers/${code}/claim`, {

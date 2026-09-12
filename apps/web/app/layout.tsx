@@ -5,6 +5,17 @@ import { Providers } from "./providers";
 export const metadata: Metadata = {
   title: "DYNEXA",
   description: "Real rewards for real, human-verified people.",
+  icons: {
+    icon: "/brand/dynexa-logo.png",
+    apple: "/brand/dynexa-logo.png",
+  },
+  openGraph: {
+    title: "DYNEXA",
+    description: "Real rewards for real, human-verified people. No wallet setup, no seed phrase.",
+    url: "https://realloyalty.dynexa.us",
+    siteName: "DYNEXA",
+    images: ["/brand/dynexa-logo.png"],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useSendTransaction } from "@privy-io/react-auth";
 import { api, type TransferInfo } from "../lib/api";
 import { USDC, arcTestnet, giftTransferData, usdcBalance, usdcTransferData } from "../lib/chain";
-import { Card, CopyButton, TxLink } from "./ui";
+import { Card, CopyButton, Logo, TxLink } from "./ui";
 import { TrackLoader } from "./loader";
 
 /** Turns a raw chain/wallet error into something a customer can read. */
@@ -27,10 +27,12 @@ export function SendModal({
 }) {
   const { sendTransaction } = useSendTransaction();
   const [amount, setAmount] = useState("1");
+  const [toContact, setToContact] = useState("");
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
+  const [delivered, setDelivered] = useState(false);
 
   async function submit() {
     setError(null);
@@ -53,14 +55,16 @@ export function SendModal({
         gasLimit: 120_000,
         chainId: arcTestnet.id,
       });
-      const { code } = await api.createTransfer({
+      const r = await api.createTransfer({
         fromAddress: wallet,
         fromContact: contact,
+        toContact: toContact || undefined,
         amountUsdc: amount,
         fromTxHash: hash,
         note: note || undefined,
       });
-      setLink(`${window.location.origin}/?gift=${code}`);
+      if (r.autoDelivered) setDelivered(true);
+      else setLink(`${window.location.origin}/?gift=${r.code}`);
     } catch (e) {
       setError(friendlyChainError((e as Error).message));
     } finally {
@@ -100,11 +104,23 @@ export function SendModal({
       )}
       <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", maxWidth: 380 }}>
         <Card>
-          {!link ? (
+          {delivered ? (
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 32 }}>🎉</div>
+              <div style={{ fontWeight: 700, fontSize: 16, margin: "6px 0" }}>Sent directly</div>
+              <p style={{ fontSize: 13, color: "var(--muted)" }}>
+                {toContact} already has a DYNEXA wallet — {amount} USDC is theirs now.
+              </p>
+              <button className="btn-ghost" style={{ width: "100%", marginTop: 14 }} onClick={onClose}>
+                Done
+              </button>
+            </div>
+          ) : !link ? (
             <>
               <div style={{ fontWeight: 700, marginBottom: 4 }}>Send USDC to a friend</div>
               <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 14 }}>
-                They get a link. No wallet? Privy creates one for them when they claim it.
+                Already on DYNEXA? It lands in their wallet right away. New here? They get a
+                link and claim it — Privy creates their wallet for them.
               </p>
               <div className="label" style={{ marginBottom: 6 }}>
                 Amount (USDC)
@@ -114,6 +130,15 @@ export function SendModal({
                 inputMode="decimal"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
+              />
+              <div className="label" style={{ marginTop: 12, marginBottom: 6 }}>
+                Friend&apos;s email or phone (optional)
+              </div>
+              <input
+                className="field"
+                value={toContact}
+                onChange={(e) => setToContact(e.target.value)}
+                placeholder="friend@email.com"
               />
               <div className="label" style={{ marginTop: 12, marginBottom: 6 }}>
                 Message (optional)
@@ -126,12 +151,14 @@ export function SendModal({
               />
               {error && <p style={{ color: "#ff8a8a", fontSize: 12, marginTop: 8 }}>{error}</p>}
               <button className="btn-primary" style={{ marginTop: 14 }} disabled={busy} onClick={submit}>
-                {busy ? "Working…" : "Send"}
+                {busy ? "Working…" : toContact ? "Send" : "Create link"}
               </button>
             </>
           ) : (
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 32 }}>🎁</div>
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 4 }}>
+                <Logo size={36} />
+              </div>
               <div style={{ fontWeight: 700, fontSize: 16, margin: "6px 0" }}>Gift link ready</div>
               <p style={{ fontSize: 13, color: "var(--muted)", marginBottom: 14 }}>
                 Send it to your friend — they claim {amount} USDC on the other end.
@@ -239,7 +266,9 @@ export function ClaimGiftCard({
           ]}
         />
       )}
-      <div style={{ fontSize: 28, textAlign: "center" }}>🎁</div>
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <Logo size={32} />
+      </div>
       <div style={{ fontWeight: 700, textAlign: "center", margin: "4px 0" }}>
         {info ? `Someone sent you ${info.amountUsdc} USDC` : "You have a gift waiting"}
       </div>
@@ -385,7 +414,9 @@ export function GiftShareModal({
             </>
           ) : (
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 32 }}>🎁</div>
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 4 }}>
+                <Logo size={36} />
+              </div>
               <div style={{ fontWeight: 700, fontSize: 16, margin: "6px 0" }}>Gift link ready</div>
               <div
                 className="num"
@@ -488,7 +519,9 @@ export function ClaimGiftTokenCard({
           ]}
         />
       )}
-      <div style={{ fontSize: 28, textAlign: "center" }}>🎁</div>
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <Logo size={32} />
+      </div>
       <div style={{ fontWeight: 700, textAlign: "center", margin: "4px 0" }}>
         {info ? `Someone sent you: ${info.campaignName}` : "You have a gift waiting"}
       </div>

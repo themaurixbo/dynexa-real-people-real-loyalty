@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { api, type Campaign, type ClaimResult } from "../lib/api";
 import { usdcBalance } from "../lib/chain";
@@ -538,8 +538,10 @@ function FlippableGiftCard({ gift, onGiftThis }: { gift: Gift; onGiftThis: () =>
       >
         <div className="glass" style={{ backfaceVisibility: "hidden" }}>
           <div className="glassin" style={{ padding: 14, textAlign: "center" }}>
-            <div style={{ fontSize: 22 }}>🎁</div>
-            <div style={{ fontSize: 12.5, fontWeight: 700, marginTop: 4 }}>{gift.campaignName}</div>
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <Logo size={30} />
+            </div>
+            <div style={{ fontSize: 12.5, fontWeight: 700, marginTop: 6 }}>{gift.campaignName}</div>
             <div className="num" style={{ fontSize: 10.5, color: "var(--muted)", marginTop: 2 }}>
               #{gift.tokenId} · {gift.status}
             </div>
@@ -661,6 +663,91 @@ function BottomNav({
         </button>
       ))}
     </nav>
+  );
+}
+
+/** Live front-camera capture — no picking a file from disk, has to be an actual selfie. */
+function SelfieCapture({
+  onCapture,
+  onError,
+}: {
+  onCapture: (dataUrl: string) => void;
+  onError: (msg: string) => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [ready, setReady] = useState(false);
+  const [denied, setDenied] = useState(false);
+
+  useEffect(() => {
+    let stream: MediaStream | null = null;
+    navigator.mediaDevices
+      ?.getUserMedia({ video: { facingMode: "user" }, audio: false })
+      .then((s) => {
+        stream = s;
+        if (videoRef.current) {
+          videoRef.current.srcObject = s;
+          videoRef.current.play().catch(() => {});
+        }
+        setReady(true);
+      })
+      .catch(() => setDenied(true));
+    return () => stream?.getTracks().forEach((t) => t.stop());
+  }, []);
+
+  function capture() {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth) {
+      onError("Camera isn't ready yet, give it a second.");
+      return;
+    }
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.translate(canvas.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, 0, 0);
+    onCapture(canvas.toDataURL("image/jpeg", 0.82));
+  }
+
+  if (denied) {
+    return (
+      <p style={{ color: "#ff8a8a", fontSize: 12.5, textAlign: "center", padding: "20px 10px" }}>
+        Camera access is off. Allow it in your browser settings to take the selfie.
+      </p>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div style={{ position: "relative", borderRadius: 13, overflow: "hidden", background: "#000" }}>
+        <video
+          ref={videoRef}
+          playsInline
+          muted
+          style={{ width: "100%", maxHeight: 240, objectFit: "cover", transform: "scaleX(-1)", display: "block" }}
+        />
+        {!ready && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--muted)",
+              fontSize: 12,
+            }}
+          >
+            Starting camera…
+          </div>
+        )}
+      </div>
+      <button className="btn-primary" disabled={!ready} onClick={capture}>
+        📸 Take selfie
+      </button>
+    </div>
   );
 }
 
@@ -811,6 +898,8 @@ function ClaimModal({
                     Retake
                   </button>
                 </div>
+              ) : isSelfie ? (
+                <SelfieCapture onCapture={setPhoto} onError={setPhotoError} />
               ) : (
                 <label
                   className="field"
@@ -826,19 +915,15 @@ function ClaimModal({
                     color: "var(--muted)",
                   }}
                 >
-                  <span style={{ fontSize: 22 }}>{isSelfie ? "🤳" : "📷"}</span>
+                  <span style={{ fontSize: 22 }}>📷</span>
                   <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink)" }}>
-                    {isSelfie ? "Take a selfie holding the product" : "Take or upload a photo"}
+                    Take or upload a photo
                   </span>
-                  <span style={{ fontSize: 11 }}>
-                    {isSelfie
-                      ? "Front camera text may look mirrored — that's fine"
-                      : "The agent reads it and checks it against the condition"}
-                  </span>
+                  <span style={{ fontSize: 11 }}>The agent reads it and checks it against the condition</span>
                   <input
                     type="file"
                     accept="image/*"
-                    capture={isSelfie ? "user" : "environment"}
+                    capture="environment"
                     onChange={onPickPhoto}
                     style={{ display: "none" }}
                   />
@@ -877,35 +962,12 @@ function ResultView({ result, onClose }: { result: ClaimResult; onClose: () => v
             ? `You received ${result.amountUsdc} USDC`
             : "Your gift is on the way"
           : result.status === "rejected"
-            ? "Reward blocked"
+            ? "Not approved this time"
             : "Waiting for business approval"}
       </div>
-      <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.5 }}>{result.reason}</p>
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 6,
-          justifyContent: "center",
-          margin: "12px 0",
-        }}
-      >
-        {result.reasonCodes.map((c) => (
-          <span
-            key={c}
-            style={{
-              fontSize: 10.5,
-              fontWeight: 600,
-              background: "rgba(255,255,255,0.06)",
-              border: "1px solid rgba(255,255,255,0.09)",
-              borderRadius: 999,
-              padding: "4px 9px",
-            }}
-          >
-            {c.replace(/_/g, " ").toLowerCase()}
-          </span>
-        ))}
-      </div>
+      <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.5, margin: "0 0 12px" }}>
+        {result.reason}
+      </p>
       <TxLink hash={result.txHash} />
       <button className="btn-ghost" style={{ width: "100%", marginTop: 14 }} onClick={onClose}>
         Done
