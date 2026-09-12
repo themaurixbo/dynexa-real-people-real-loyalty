@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
-import { api, type Campaign, type ClaimResult } from "../lib/api";
+import { api, type ActivityItem, type Campaign, type ClaimResult } from "../lib/api";
 import { usdcBalance } from "../lib/chain";
 import { fileToDataUrl } from "../lib/image";
 import { BrandMark, Card, ErrorNote, Logo, Partner, TxLink, WalletCard } from "./ui";
@@ -28,6 +28,25 @@ const CATEGORY_LABEL: Record<Category, string> = {
   food: "Food",
   events: "Events",
 };
+
+function activityIcon(type: ActivityItem["type"]): string {
+  switch (type) {
+    case "usdc_won":
+      return "💰";
+    case "gift_won":
+      return "🎁";
+    case "gift_redeemed":
+      return "✅";
+    case "usdc_sent":
+      return "↗️";
+    case "usdc_received":
+      return "↙️";
+    case "gift_sent":
+      return "📤";
+    case "gift_received":
+      return "📥";
+  }
+}
 
 function clearParam(name: string) {
   const url = new URL(window.location.href);
@@ -171,6 +190,7 @@ function Home({
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [category, setCategory] = useState<Category>("all");
   const [gifts, setGifts] = useState<Gift[]>([]);
+  const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [claiming, setClaiming] = useState<Campaign | null>(null);
   const [referring, setReferring] = useState<Campaign | null>(null);
   const [sending, setSending] = useState(false);
@@ -181,6 +201,7 @@ function Home({
     if (!wallet) return;
     usdcBalance(wallet).then(setBalance);
     api.gifts(wallet).then(setGifts).catch(() => {});
+    api.activity(wallet).then(setActivity).catch(() => {});
     api
       .campaigns()
       .then((c) =>
@@ -361,7 +382,7 @@ function Home({
         <SendModal wallet={wallet} contact={contact} onClose={() => setSending(false)} />
       )}
 
-      {(tab === "home" || tab === "gifts") && (
+      {(tab === "home" || tab === "gifts" || tab === "wallet") && (
         <section style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 20 }}>
           <div className="label">Your gifts</div>
           {gifts.length === 0 && (
@@ -424,6 +445,38 @@ function Home({
               </Card>
             );
           })}
+        </section>
+      )}
+
+      {tab === "home" && (
+        <section style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 20 }}>
+          <div className="label">Recent activity</div>
+          {activity.length === 0 && (
+            <p style={{ color: "var(--muted)", fontSize: 13 }}>Nothing yet — your rewards and transfers show up here.</p>
+          )}
+          {activity.map((a) => (
+            <div
+              key={a.id}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "10px 4px",
+                borderBottom: "1px solid rgba(255,255,255,0.06)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 16 }}>{activityIcon(a.type)}</span>
+                <span style={{ fontSize: 13 }}>{a.label}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span className="num" style={{ fontSize: 10.5, color: "var(--muted)" }}>
+                  {new Date(a.at).toLocaleDateString()}
+                </span>
+                <TxLink hash={a.txHash} />
+              </div>
+            </div>
+          ))}
         </section>
       )}
 
