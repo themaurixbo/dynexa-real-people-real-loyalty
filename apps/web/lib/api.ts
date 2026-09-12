@@ -63,6 +63,22 @@ export interface ClaimResult {
   txHash?: string;
 }
 
+export interface ActivityItem {
+  id: string;
+  type:
+    | "usdc_won"
+    | "gift_won"
+    | "gift_redeemed"
+    | "usdc_sent"
+    | "usdc_received"
+    | "gift_sent"
+    | "gift_received";
+  label: string;
+  amountUsdc?: string;
+  txHash?: string;
+  at: string;
+}
+
 export interface TransferInfo {
   code: string;
   amountUsdc: string;
@@ -207,6 +223,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ address, contact }),
     }),
+  activity: (address: string) => req<ActivityItem[]>(`/activity?address=${address}`),
 };
 
 export const explorerTx = (hash: string) => `https://testnet.arcscan.app/tx/${hash}`;

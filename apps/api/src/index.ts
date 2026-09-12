@@ -3,6 +3,7 @@ import Fastify from "fastify";
 import { env } from "./lib/env.js";
 import { transferEscrow } from "./lib/chain.js";
 import { agentSigner } from "./agent/signer.js";
+import { activityRoutes } from "./routes/activity.js";
 import { adminRoutes } from "./routes/admin.js";
 import { campaignRoutes } from "./routes/campaigns.js";
 import { claimRoutes } from "./routes/claims.js";
@@ -35,6 +36,7 @@ await app.register(worldRoutes);
 await app.register(businessRoutes);
 await app.register(transferRoutes);
 await app.register(adminRoutes);
+await app.register(activityRoutes);
 
 app
   .listen({ port: env.port, host: "0.0.0.0" })
