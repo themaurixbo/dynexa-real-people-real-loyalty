@@ -15,43 +15,57 @@ An AI-powered loyalty platform that enables businesses to deliver USDC and brand
 
 DYNEXA helps businesses create loyalty campaigns funded with USDC. Customers can join with a familiar login, receive an embedded wallet, verify they are real people and earn useful rewards without dealing with seed phrases, gas or crypto complexity.
 
-For ETHOnline 2026, we are building DYNEXA from scratch with Privy, Arc and World. The MVP will let a business fund a campaign, set spending limits and use AI to evaluate purchases before delivering USDC and branded GiftTokens. It will also prevent duplicate claims, block unauthorized payments and support GiftToken redemption at the point of sale.
+For ETHOnline 2026 we built DYNEXA from scratch with Privy, Arc and World. A
+business funds a campaign, sets spending limits, and picks how customers prove
+they qualify — a purchase receipt, a selfie with the product, or referring a
+friend. AI evaluates the proof; a deterministic policy engine and the on-chain
+contract decide whether it pays, never the AI. GiftTokens are redeemable at the
+point of sale, and both USDC and GiftTokens can be sent peer-to-peer by link.
 
-## Development Plan
+## What we built
 
-We will start with the core payment flow: creating the business and customer wallets with Privy and sending a real USDC reward on Arc testnet. We are doing this first because the rest of the product depends on having a secure and reliable way to move rewards.
-
-Once that works, we will add World Selfie Check to confirm that a real person is claiming the reward. Then we will connect the AI agent, which will review the purchase and campaign rules before proposing how much the customer should receive. The final decision will always pass through fixed spending limits before any payment is made.
-
-Next, we will add the branded GiftToken, the POS redemption flow and the business dashboard. The dashboard will show the campaign budget, rewards delivered, blocked claims and onchain transactions.
-
-Finally, we will test the complete journey, including duplicate claims, excessive payments and repeated redemptions. Our demo will focus on one clear flow: a business funds a campaign, a verified customer completes a purchase, the AI approves the reward and DYNEXA delivers real value while keeping the business in control.
+- **Three ways to qualify**: purchase receipt (photo or a pasted social-post
+  link), consumption selfie (live camera, not a file picker), and referrals
+  (the referrer and the new customer both get paid, in two separate
+  transactions).
+- **AI proposes, the chain decides**: vision model checks the evidence and
+  gives a specific reason either way ("the invoice total is X, below the Y
+  required") — it never sets or approves an amount. An 8-check deterministic
+  policy engine and the smart contract enforce the real limits.
+- **Real human uniqueness**: World Selfie Check gates the welcome gift; the
+  per-person limit is counted by the verified World identity, not by account,
+  so a second sign-up can't dodge it.
+- **Seedless wallets**: Privy creates an embedded wallet on Arc the moment a
+  customer signs in with email or phone — no seed phrase, ever.
+- **Business control**: real on-chain balance per campaign (not an internal
+  counter), a "NO FUNDS" warning, a manual-approval queue for large claims, a
+  full decision history with the real transaction link, and a kill switch that
+  pauses every automatic payout platform-wide.
+- **GiftTokens and P2P**: branded ERC-1155 gifts with a flip card, QR code and
+  redemption at the point of sale; USDC or a GiftToken can be sent to a friend
+  by link (WhatsApp-ready) or delivered straight to their wallet if they
+  already use DYNEXA.
 
 ## Status
 
 Live: **[realloyalty.dynexa.us](https://realloyalty.dynexa.us)** (frontend) ·
-**apirealloyalty.dynexa.us** (backend).
+**apirealloyalty.dynexa.us** (backend). Contracts verified on ArcScan.
 
-Working end to end on Arc testnet:
+The live server runs the real Circle Agent Wallet (`AGENT_SIGNER=circle`), AI
+vision verification, and real World Selfie Check — everything above is live,
+not mocked. Tx hashes in [docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md) and the
+demo walkthrough in [DEMO_SCRIPT.md](DEMO_SCRIPT.md).
 
-- Autonomous agent: claim → policy engine (8 checks) → Circle Agent Wallet
-  executes the USDC payout (or the GiftToken mint). Over-limit payouts revert.
-- `CampaignTreasuryFactory`, `GiftToken` and a live `CampaignTreasury` deployed
-  and **verified on ArcScan**.
-- World Selfie Check: RP signature, proof verification, nullifier gate — a claim
-  without verification is rejected.
-- Privy embedded consumer wallet on Arc; GiftToken mint + POS redeem + double-
-  redeem block; agent-to-agent payment.
-
-The live server runs the Circle Agent Wallet (`AGENT_SIGNER=circle`), AI vision
-verification, and the real World Selfie Check. Tx hashes in
-[docs/DEPLOYMENTS.md](docs/DEPLOYMENTS.md). Still connecting: the Privy business
-server wallet + spending policy — the code is in place but Privy has not
-authorized the app for Arc (see [FEEDBACK_PRIVY.md](FEEDBACK_PRIVY.md)), so
-business-side funding uses the deployer key for now.
+Still connecting: the Privy **business** server wallet — the code and its
+spending policy are built and deployed, but Privy's server wallets only
+transact on a preset chain list that doesn't include Arc yet (see
+[FEEDBACK_PRIVY.md](FEEDBACK_PRIVY.md)), so business-side funding uses a
+direct key for now. The consumer side (embedded wallet, no seed phrase) is
+fully live.
 
 ## Docs
 
+- [DEMO_SCRIPT.md](DEMO_SCRIPT.md) — 4-minute walkthrough, what to click and say
 - [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) — working plan and cut order
 - [SPIKES.md](SPIKES.md) — Arc / Privy / World research and open blockers
 - [PREEXISTING_WORK.md](PREEXISTING_WORK.md) — greenfield compliance disclosure
