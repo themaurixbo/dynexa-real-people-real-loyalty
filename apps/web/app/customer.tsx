@@ -105,9 +105,11 @@ export function CustomerApp() {
               color: "var(--magenta)",
             }}
           >
-            {giftCode || giftTokenCode
-              ? "🎁 Someone sent you a gift — sign in to claim it"
-              : "🔗 You were invited — sign in to see the reward"}
+            {giftCode
+              ? "🎁 Someone sent you USDC — sign in to claim it"
+              : giftTokenCode
+                ? "🎁 Someone sent you a GiftToken — sign in to claim it"
+                : "🔗 You were invited — sign in to see the reward"}
           </p>
         )}
         <button className="btn-primary" onClick={login}>
@@ -308,7 +310,7 @@ function Home({
                 <div style={{ fontWeight: 700, fontSize: 17 }}>Verify you&apos;re human</div>
                 <p style={{ fontSize: 13, color: "var(--muted)", margin: "6px 0 16px", lineHeight: 1.5 }}>
                   One quick check with World — a few seconds, no personal data stored.
-                  Unlocks your welcome gift and every reward after it.
+                  Unlocks your welcome GiftToken and every reward after it.
                 </p>
                 <WorldVerify
                   contact={contact}
@@ -384,9 +386,9 @@ function Home({
 
       {(tab === "home" || tab === "gifts" || tab === "wallet") && (
         <section style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 20 }}>
-          <div className="label">Your gifts</div>
+          <div className="label">Your GiftTokens</div>
           {gifts.length === 0 && (
-            <p style={{ color: "var(--muted)", fontSize: 13 }}>No gifts yet.</p>
+            <p style={{ color: "var(--muted)", fontSize: 13 }}>No GiftTokens yet.</p>
           )}
           <div
             style={{
@@ -429,7 +431,7 @@ function Home({
                   <Partner name="Arc" />
                 </div>
                 <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
-                  {c.rewardMode === "usdc" ? `${Number(c.rewardPerUserUsdc)} USDC` : "A branded gift"} ·
+                  {c.rewardMode === "usdc" ? `${Number(c.rewardPerUserUsdc)} USDC` : "A branded GiftToken"} ·
                   up to {c.maxUsesPerHuman} per person
                   {c.rewardType === "selfie" ? " · selfie required" : ""}
                   {c.rewardType === "referral" ? " · refer a friend" : ""}
@@ -556,9 +558,9 @@ function WelcomeGiftModal({ onClose, txHash }: { onClose: () => void; txHash?: s
         <Card>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 44 }}>🎉</div>
-            <div style={{ fontWeight: 700, fontSize: 18, margin: "8px 0 4px" }}>Welcome gift unlocked!</div>
+            <div style={{ fontWeight: 700, fontSize: 18, margin: "8px 0 4px" }}>Welcome GiftToken unlocked!</div>
             <p style={{ fontSize: 13, color: "var(--muted)" }}>
-              Thanks for verifying you're a real person. Check your Gifts tab.
+              Thanks for verifying you're a real person. Check your GiftTokens tab.
             </p>
             <TxLink hash={txHash} />
             <button className="btn-primary" style={{ marginTop: 14 }} onClick={onClose}>
@@ -666,7 +668,7 @@ function BottomNav({
   const items = [
     { id: "home", label: "Home", icon: "M3 9L10 3L17 9V16.5C17 17 16.5 17.5 16 17.5H4C3.5 17.5 3 17 3 16.5Z" },
     { id: "wallet", label: "Wallet", icon: "M2.5 6H17.5V15A1.5 1.5 0 0 1 16 16.5H4A1.5 1.5 0 0 1 2.5 15Z" },
-    { id: "gifts", label: "Gifts", icon: "M3 8H17V16H3ZM10 4V16M5 8C5 5 10 5 10 8C10 5 15 5 15 8" },
+    { id: "gifts", label: "GiftTokens", icon: "M3 8H17V16H3ZM10 4V16M5 8C5 5 10 5 10 8C10 5 15 5 15 8" },
     { id: "profile", label: "Profile", icon: "M10 10a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM4 17c0-3 3-5 6-5s6 2 6 5" },
   ] as const;
   return (
@@ -870,7 +872,7 @@ function ClaimModal({
           { brand: "World" as const, label: "Checking you are a real, unique person" },
           { brand: "DYNEXA" as const, label: "The agent reviews your proof" },
           { brand: "DYNEXA" as const, label: "Applying the campaign's rules and limits" },
-          { brand: "Circle" as const, label: "The Circle Agent Wallet mints your gift" },
+          { brand: "Circle" as const, label: "The Circle Agent Wallet mints your GiftToken" },
           { brand: "Arc" as const, label: "Confirming the GiftToken on Arc" },
         ]
       : [
@@ -1013,7 +1015,7 @@ function ResultView({ result, onClose }: { result: ClaimResult; onClose: () => v
         {good
           ? result.amountUsdc
             ? `You received ${result.amountUsdc} USDC`
-            : "Your gift is on the way"
+            : "Your GiftToken is on the way"
           : result.status === "rejected"
             ? "Not approved this time"
             : "Waiting for business approval"}

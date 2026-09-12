@@ -512,7 +512,7 @@ function CreateCampaign({ businessName, onCreated }: { businessName: string; onC
         </Row>
         {f.rewardMode === "gift" && (
           <>
-            <Field label="Gift name">
+            <Field label="GiftToken name">
               <input className="field" value={f.giftName} onChange={(e) => set("giftName", e.target.value)} />
             </Field>
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
@@ -636,7 +636,7 @@ function Approvals({
             <div>
               <div style={{ fontWeight: 700 }}>{nameFor(c.campaignId)}</div>
               <div style={{ fontSize: 12, color: "var(--muted)" }}>
-                {c.cashAmountUsdc ? `${Number(c.cashAmountUsdc)} USDC` : "gift"} ·{" "}
+                {c.cashAmountUsdc ? `${Number(c.cashAmountUsdc)} USDC` : "GiftToken"} ·{" "}
                 {new Date(c.createdAt).toLocaleString()}
               </div>
             </div>
@@ -724,15 +724,15 @@ function Pos() {
     <Card style={{ maxWidth: 420 }}>
       {busy && (
         <TrackLoader
-          title="Redeeming the gift"
+          title="Redeeming the GiftToken"
           steps={[
-            { brand: "DYNEXA", label: "Looking up the gift code" },
+            { brand: "DYNEXA", label: "Looking up the GiftToken code" },
             { brand: "Arc", label: "Redeeming and burning the GiftToken on Arc" },
           ]}
         />
       )}
       <div className="label" style={{ marginBottom: 6 }}>
-        Point of sale — redeem a gift
+        Point of sale — redeem a GiftToken
       </div>
       <input
         className="field"
@@ -761,7 +761,7 @@ function Pos() {
         <div style={{ marginTop: 12, textAlign: "center" }}>
           <div style={{ fontSize: 24 }}>{res.status === "success" ? "✅" : "⛔"}</div>
           <div style={{ fontWeight: 700 }}>
-            {res.status === "success" ? "Gift redeemed" : "Redemption blocked"}
+            {res.status === "success" ? "GiftToken redeemed" : "Redemption blocked"}
           </div>
           {res.reason && (
             <p style={{ fontSize: 12, color: "var(--muted)" }}>{res.reason}</p>

@@ -351,7 +351,7 @@ export function GiftShareModal({
   }
 
   const waLink = link
-    ? `https://wa.me/?text=${encodeURIComponent(`I sent you a gift on DYNEXA 🎁 Claim it here: ${link}`)}`
+    ? `https://wa.me/?text=${encodeURIComponent(`I sent you a GiftToken on DYNEXA 🎁 Claim it here: ${link}`)}`
     : null;
 
   return (
@@ -385,7 +385,7 @@ export function GiftShareModal({
               <div style={{ fontSize: 28 }}>🎉</div>
               <div style={{ fontWeight: 700, margin: "6px 0" }}>Delivered directly</div>
               <p style={{ fontSize: 13, color: "var(--muted)" }}>
-                {toContact} already has a DYNEXA wallet — the gift is theirs now.
+                {toContact} already has a DYNEXA wallet — the GiftToken is theirs now.
               </p>
               <button className="btn-ghost" style={{ width: "100%", marginTop: 12 }} onClick={onClose}>
                 Done
@@ -417,7 +417,7 @@ export function GiftShareModal({
               <div style={{ display: "flex", justifyContent: "center", marginBottom: 4 }}>
                 <Logo size={36} />
               </div>
-              <div style={{ fontWeight: 700, fontSize: 16, margin: "6px 0" }}>Gift link ready</div>
+              <div style={{ fontWeight: 700, fontSize: 16, margin: "6px 0" }}>GiftToken link ready</div>
               <div
                 className="num"
                 style={{
@@ -498,7 +498,7 @@ export function ClaimGiftTokenCard({
       <Card>
         <div style={{ textAlign: "center" }}>
           <div style={{ fontSize: 28 }}>🎉</div>
-          <div style={{ fontWeight: 700, margin: "4px 0" }}>You received a gift!</div>
+          <div style={{ fontWeight: 700, margin: "4px 0" }}>You received a GiftToken!</div>
           <TxLink hash={txHash} />
           <button className="btn-ghost" style={{ width: "100%", marginTop: 12 }} onClick={onClaimed}>
             Nice
@@ -512,9 +512,9 @@ export function ClaimGiftTokenCard({
     <Card>
       {busy && (
         <TrackLoader
-          title="Claiming your gift"
+          title="Claiming your GiftToken"
           steps={[
-            { brand: "DYNEXA", label: "Looking up the gift" },
+            { brand: "DYNEXA", label: "Looking up the GiftToken" },
             { brand: "Arc", label: "Sending the GiftToken to your wallet" },
           ]}
         />
@@ -523,11 +523,11 @@ export function ClaimGiftTokenCard({
         <Logo size={32} />
       </div>
       <div style={{ fontWeight: 700, textAlign: "center", margin: "4px 0" }}>
-        {info ? `Someone sent you: ${info.campaignName}` : "You have a gift waiting"}
+        {info ? `Someone sent you: ${info.campaignName}` : "You have a GiftToken waiting"}
       </div>
       {info?.status === "claimed" ? (
         <p style={{ fontSize: 13, color: "var(--muted)", textAlign: "center", marginTop: 8 }}>
-          This gift was already claimed.
+          This GiftToken was already claimed.
         </p>
       ) : (
         <>
@@ -535,7 +535,7 @@ export function ClaimGiftTokenCard({
             <p style={{ color: "#ff8a8a", fontSize: 12, textAlign: "center", marginTop: 8 }}>{error}</p>
           )}
           <button className="btn-primary" style={{ marginTop: 12 }} disabled={busy || !info} onClick={claim}>
-            {busy ? "Working…" : "Claim gift"}
+            {busy ? "Working…" : "Claim GiftToken"}
           </button>
         </>
       )}
