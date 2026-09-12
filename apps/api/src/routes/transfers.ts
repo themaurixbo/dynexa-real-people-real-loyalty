@@ -33,6 +33,7 @@ export async function transferRoutes(app: FastifyInstance) {
       .object({
         fromAddress: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
         fromContact: z.string().optional(),
+        toContact: z.string().optional(),
         amountUsdc: z.string(),
         fromTxHash: z.string().regex(/^0x[a-fA-F0-9]{64}$/),
         note: z.string().max(140).optional(),
@@ -59,15 +60,41 @@ export async function transferRoutes(app: FastifyInstance) {
       : undefined;
 
     const code = genCode();
-    await db.insert(p2pTransfers).values({
-      code,
-      kind: "usdc",
-      fromUserId: fromUser?.id,
-      fromAddress: body.fromAddress,
-      amountUsdc: body.amountUsdc,
-      note: body.note,
-      fromTxHash: body.fromTxHash,
-    });
+    const [row] = await db
+      .insert(p2pTransfers)
+      .values({
+        code,
+        kind: "usdc",
+        fromUserId: fromUser?.id,
+        fromAddress: body.fromAddress,
+        toContact: body.toContact,
+        amountUsdc: body.amountUsdc,
+        note: body.note,
+        fromTxHash: body.fromTxHash,
+      })
+      .returning();
+
+    // Direct send: if the contact already has a real Privy wallet, deliver right away.
+    if (body.toContact) {
+      const toUser = await db.query.users.findFirst({ where: eq(users.privyUserId, body.toContact) });
+      if (toUser) {
+        const [w] = await db
+          .select()
+          .from(wallets)
+          .where(
+            and(eq(wallets.ownerId, toUser.id), eq(wallets.ownerType, "user"), eq(wallets.provider, "privy")),
+          );
+        if (w) {
+          const txHash = await sendUsdc(w.address as `0x${string}`, amount);
+          await db
+            .update(p2pTransfers)
+            .set({ status: "claimed", toAddress: w.address, toUserId: toUser.id, toTxHash: txHash, claimedAt: new Date() })
+            .where(eq(p2pTransfers.id, row.id));
+          return { code, amountUsdc: body.amountUsdc, autoDelivered: { toAddress: w.address, txHash } };
+        }
+      }
+    }
+
     return { code, amountUsdc: body.amountUsdc };
   });
 
