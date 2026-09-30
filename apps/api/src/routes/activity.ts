@@ -3,7 +3,17 @@ import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db, schema } from "../db/client.js";
 
-const { wallets, claims, campaigns, giftTokenIssuances, redemptions, p2pTransfers } = schema;
+const {
+  wallets,
+  claims,
+  campaigns,
+  giftTokenIssuances,
+  redemptions,
+  p2pTransfers,
+  dynexaLedger,
+  businesses,
+  posCharges,
+} = schema;
 
 export interface ActivityItem {
   id: string;
@@ -14,9 +24,12 @@ export interface ActivityItem {
     | "usdc_sent"
     | "usdc_received"
     | "gift_sent"
-    | "gift_received";
+    | "gift_received"
+    | "dynexa_won"
+    | "dynexa_spent";
   label: string;
   amountUsdc?: string;
+  amountDynexa?: string;
   txHash?: string;
   at: string;
 }
@@ -64,6 +77,26 @@ export async function activityRoutes(app: FastifyInstance) {
           type: "gift_redeemed",
           label: `Redeemed gift #${issuance.tokenId}`,
           at: redemption.createdAt.toISOString(),
+        });
+      }
+
+      const ledgerRows = await db
+        .select({ entry: dynexaLedger, charge: posCharges, business: businesses })
+        .from(dynexaLedger)
+        .leftJoin(posCharges, eq(dynexaLedger.chargeId, posCharges.id))
+        .leftJoin(businesses, eq(posCharges.businessId, businesses.id))
+        .where(eq(dynexaLedger.userId, wallet.ownerId));
+
+      for (const { entry, business } of ledgerRows) {
+        const isEarn = Number(entry.delta) >= 0;
+        items.push({
+          id: entry.id,
+          type: isEarn ? "dynexa_won" : "dynexa_spent",
+          label: isEarn
+            ? `Earned ${Number(entry.delta)} DYNEXA`
+            : `Spent ${Math.abs(Number(entry.delta))} DYNEXA at ${business?.name ?? "a business"}`,
+          amountDynexa: entry.delta,
+          at: entry.createdAt.toISOString(),
         });
       }
     }

@@ -1,4 +1,4 @@
-import { and, count, eq, inArray } from "drizzle-orm";
+import { and, count, eq, inArray, sql } from "drizzle-orm";
 import { decodeEventLog, keccak256, toHex } from "viem";
 import { db, schema } from "../db/client.js";
 import { env } from "../lib/env.js";
@@ -22,6 +22,7 @@ const {
   blockchainTransactions,
   auditEvents,
   referralLinks,
+  dynexaLedger,
 } = schema;
 
 export interface ClaimRequest {
@@ -32,6 +33,8 @@ export interface ClaimRequest {
   evidenceText?: string;
   receiptRef: string;
   referralCode?: string;
+  // dynexa (percentage-reward) campaigns only: the invoice total, in Bolivianos.
+  invoiceAmountBs?: string;
 }
 
 export interface ClaimResult {
@@ -40,6 +43,7 @@ export interface ClaimResult {
   reason: string;
   reasonCodes: string[];
   amountUsdc?: string;
+  dynexaAmount?: string;
   giftTokenId?: number | null;
   txHash?: string;
 }
@@ -49,7 +53,12 @@ export async function runRewardClaim(reqBody: ClaimRequest): Promise<ClaimResult
     where: eq(campaigns.id, reqBody.campaignId),
   });
   if (!campaign) throw new Error("campaign not found");
-  if (!campaign.treasuryAddress) throw new Error("campaign has no treasury");
+  if (campaign.rewardMode !== "dynexa" && !campaign.treasuryAddress) {
+    throw new Error("campaign has no treasury");
+  }
+  if (campaign.rewardMode === "dynexa" && !reqBody.invoiceAmountBs) {
+    throw new Error("invoiceAmountBs is required for this campaign");
+  }
 
   const user = await findOrCreateUser(reqBody.contact, reqBody.customerAddress);
   const verification = await getVerification(user.id);
@@ -115,6 +124,15 @@ export async function runRewardClaim(reqBody: ClaimRequest): Promise<ClaimResult
     campaign.rewardMode === "usdc"
       ? await treasuryBalance(campaign.treasuryAddress as `0x${string}`)
       : 0n;
+  // dynexa: reward is a straight percentage of the invoice total (Bs), no FX —
+  // it's a points balance, not USDC, so there's no exchange rate to apply.
+  const dynexaAmount =
+    campaign.rewardMode === "dynexa"
+      ? (
+          Number(reqBody.invoiceAmountBs) *
+          (Number(campaign.rewardPercentage ?? "0") / 100)
+        ).toFixed(2)
+      : null;
   const now = new Date();
   const platformActive = !(await isPlatformPaused());
 
@@ -148,6 +166,8 @@ export async function runRewardClaim(reqBody: ClaimRequest): Promise<ClaimResult
       userId: user.id,
       status: "pending",
       cashAmountUsdc: campaign.rewardPerUserUsdc,
+      invoiceAmountBs: reqBody.invoiceAmountBs ?? null,
+      dynexaAmount,
     })
     .returning();
 
@@ -226,6 +246,18 @@ export async function runRewardClaim(reqBody: ClaimRequest): Promise<ClaimResult
     };
   }
 
+  if (campaign.rewardMode === "dynexa") {
+    const credited = await creditDynexaAndRecord(claim.id, user, dynexaAmount!);
+    if (referral) await payReferrer(campaign, referral, claim.id, dynexaAmount!);
+    return {
+      claimId: claim.id,
+      status: "paid",
+      reason: verdict.reason,
+      reasonCodes,
+      dynexaAmount: credited.dynexaAmount,
+    };
+  }
+
   const paid = await payAndRecord(claim.id, campaign, user, { nullifierHash, receiptHash });
   if (referral) await payReferrer(campaign, referral, claim.id);
   return {
@@ -246,6 +278,7 @@ async function payReferrer(
   campaign: typeof schema.campaigns.$inferSelect,
   referral: typeof schema.referralLinks.$inferSelect,
   referredClaimId: string,
+  dynexaAmount?: string,
 ) {
   try {
     const referrer = await db.query.users.findFirst({ where: eq(users.id, referral.referrerUserId) });
@@ -257,9 +290,17 @@ async function payReferrer(
         userId: referrer.id,
         status: "pending",
         cashAmountUsdc: campaign.rewardPerUserUsdc,
+        dynexaAmount: dynexaAmount ?? null,
         referredByLinkId: referral.id,
       })
       .returning();
+
+    if (campaign.rewardMode === "dynexa") {
+      await creditDynexaAndRecord(refClaim.id, referrer, dynexaAmount!);
+      await audit("agent", "referral.paid", "claim", refClaim.id, { referredClaimId });
+      return;
+    }
+
     const refVerification = await getVerification(referrer.id);
     const refs = {
       nullifierHash: refVerification
@@ -276,6 +317,30 @@ async function payReferrer(
   } catch (e) {
     await audit("agent", "referral.failed", "claim", referredClaimId, { error: (e as Error).message });
   }
+}
+
+/** dynexa campaigns: credit the user's off-chain points balance. No chain call. */
+export async function creditDynexaAndRecord(
+  claimId: string,
+  user: typeof schema.users.$inferSelect,
+  dynexaAmount: string,
+) {
+  await db.insert(dynexaLedger).values({
+    userId: user.id,
+    delta: dynexaAmount,
+    reason: "claim_reward",
+    claimId,
+  });
+  await db
+    .update(users)
+    .set({ dynexaBalance: sql`${users.dynexaBalance} + ${dynexaAmount}::numeric` })
+    .where(eq(users.id, user.id));
+  await db
+    .update(claims)
+    .set({ status: "paid", dynexaAmount, decidedAt: new Date() })
+    .where(eq(claims.id, claimId));
+  await audit("agent", "claim.dynexa_paid", "claim", claimId, { dynexaAmount });
+  return { dynexaAmount };
 }
 
 /** Used both by the agent (auto) and by a business approval. */

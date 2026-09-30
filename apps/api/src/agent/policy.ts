@@ -4,7 +4,7 @@
  */
 
 export interface PolicyInput {
-  rewardMode: "usdc" | "gift";
+  rewardMode: "usdc" | "gift" | "dynexa";
   platformActive: boolean;
   campaignActive: boolean;
   withinDates: boolean;

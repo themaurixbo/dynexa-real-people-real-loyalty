@@ -33,7 +33,7 @@ export const campaignStatus = pgEnum("campaign_status", [
 ]);
 export const rewardType = pgEnum("reward_type", ["receipt", "selfie", "referral"]);
 export const campaignCategory = pgEnum("campaign_category", ["shopping", "food", "events"]);
-export const rewardMode = pgEnum("reward_mode", ["usdc", "gift"]);
+export const rewardMode = pgEnum("reward_mode", ["usdc", "gift", "dynexa"]);
 export const claimStatus = pgEnum("claim_status", [
   "pending",
   "approved",
@@ -61,6 +61,9 @@ export const users = pgTable("users", {
   id: id(),
   privyUserId: text("privy_user_id").notNull().unique(),
   email: text("email"),
+  // DYNEXA points: an off-chain loyalty balance, separate from real USDC.
+  // Earned from percentage-reward campaigns, spent at a POS "Cobrar" charge.
+  dynexaBalance: numeric("dynexa_balance", { precision: 20, scale: 2 }).notNull().default("0"),
   createdAt: createdAt(),
 });
 
@@ -109,6 +112,9 @@ export const campaigns = pgTable("campaigns", {
   category: campaignCategory("category").notNull().default("shopping"),
   referenceImages: jsonb("reference_images").$type<string[]>().default([]),
   giftTransferable: boolean("gift_transferable").notNull().default(false),
+  // rewardMode "dynexa" only: reward = invoice total (Bs) * this% — no on-chain
+  // treasury, points are credited straight to the user's off-chain balance.
+  rewardPercentage: numeric("reward_percentage", { precision: 5, scale: 2 }),
   treasuryAddress: text("treasury_address"),
   agentSignerAddress: text("agent_signer_address"),
   totalBudgetUsdc: usdc("total_budget_usdc").notNull(),
@@ -183,6 +189,9 @@ export const claims = pgTable(
     cashAmountUsdc: usdc("cash_amount_usdc"),
     giftTokenId: bigint("gift_token_id", { mode: "number" }),
     onchainClaimId: text("onchain_claim_id"),
+    // rewardMode "dynexa" only
+    invoiceAmountBs: numeric("invoice_amount_bs", { precision: 20, scale: 2 }),
+    dynexaAmount: numeric("dynexa_amount", { precision: 20, scale: 2 }),
     referredByLinkId: uuid("referred_by_link_id"),
     createdAt: createdAt(),
     decidedAt: timestamp("decided_at", { withTimezone: true }),
@@ -330,6 +339,42 @@ export const p2pTransfers = pgTable("p2p_transfers", {
   toTxHash: text("to_tx_hash"),
   createdAt: createdAt(),
   claimedAt: timestamp("claimed_at", { withTimezone: true }),
+});
+
+// --- DYNEXA points (off-chain loyalty balance) ---
+
+export const dynexaLedgerReason = pgEnum("dynexa_ledger_reason", ["claim_reward", "pos_redeem"]);
+export const posChargeStatus = pgEnum("pos_charge_status", ["pending", "paid", "canceled"]);
+
+/** One row per balance movement — the audit trail behind `users.dynexaBalance`. */
+export const dynexaLedger = pgTable("dynexa_ledger", {
+  id: id(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id),
+  delta: numeric("delta", { precision: 20, scale: 2 }).notNull(),
+  reason: dynexaLedgerReason("reason").notNull(),
+  claimId: uuid("claim_id"),
+  chargeId: uuid("charge_id"),
+  createdAt: createdAt(),
+});
+
+/**
+ * A business "Cobrar" request: pick an amount in DYNEXA, get a one-time QR.
+ * The customer scans it in-app, confirms, and the amount moves off their
+ * dynexaBalance — no chain involved, it's a closed-loop points spend.
+ */
+export const posCharges = pgTable("pos_charges", {
+  id: id(),
+  businessId: uuid("business_id")
+    .notNull()
+    .references(() => businesses.id),
+  code: text("code").notNull().unique(),
+  amountDynexa: numeric("amount_dynexa", { precision: 20, scale: 2 }).notNull(),
+  status: posChargeStatus("status").notNull().default("pending"),
+  payerUserId: uuid("payer_user_id").references(() => users.id),
+  createdAt: createdAt(),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
 });
 
 /** Single row, id "global". Kill switch stops every automatic payout platform-wide. */

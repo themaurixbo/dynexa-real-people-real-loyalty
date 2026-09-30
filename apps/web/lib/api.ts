@@ -23,10 +23,11 @@ export interface Campaign {
   businessId: string;
   name: string;
   category: "shopping" | "food" | "events";
-  rewardMode: "usdc" | "gift";
+  rewardMode: "usdc" | "gift" | "dynexa";
   rewardType: "receipt" | "selfie" | "referral";
   status: string;
   treasuryAddress: string | null;
+  rewardPercentage: string | null;
   rewardPerUserUsdc: string;
   totalBudgetUsdc: string;
   maxPerTxUsdc: string;
@@ -48,6 +49,8 @@ export interface Claim {
   status: "pending" | "approved" | "rejected" | "paid" | "failed";
   rejectionReason: string | null;
   cashAmountUsdc: string | null;
+  invoiceAmountBs?: string | null;
+  dynexaAmount?: string | null;
   createdAt: string;
   decidedAt: string | null;
   txHash?: string;
@@ -59,6 +62,7 @@ export interface ClaimResult {
   reason: string;
   reasonCodes: string[];
   amountUsdc?: string;
+  dynexaAmount?: string;
   giftTokenId?: number | null;
   txHash?: string;
 }
@@ -72,9 +76,12 @@ export interface ActivityItem {
     | "usdc_sent"
     | "usdc_received"
     | "gift_sent"
-    | "gift_received";
+    | "gift_received"
+    | "dynexa_won"
+    | "dynexa_spent";
   label: string;
   amountUsdc?: string;
+  amountDynexa?: string;
   txHash?: string;
   at: string;
 }
@@ -224,6 +231,21 @@ export const api = {
       body: JSON.stringify({ address, contact }),
     }),
   activity: (address: string) => req<ActivityItem[]>(`/activity?address=${address}`),
+  dynexaBalance: (address: string) => req<{ balance: string }>(`/dynexa/balance?address=${address}`),
+  createDynexaCharge: (businessId: string, amountDynexa: string) =>
+    req<{ code: string; amountDynexa: string; businessName: string }>("/dynexa/charges", {
+      method: "POST",
+      body: JSON.stringify({ businessId, amountDynexa }),
+    }),
+  getDynexaCharge: (code: string) =>
+    req<{ code: string; amountDynexa: string; status: string; businessName: string }>(
+      `/dynexa/charges/${code}`,
+    ),
+  payDynexaCharge: (code: string, address: string, contact?: string) =>
+    req<{ status: string; amountDynexa: string }>(`/dynexa/charges/${code}/pay`, {
+      method: "POST",
+      body: JSON.stringify({ address, contact }),
+    }),
 };
 
 export const explorerTx = (hash: string) => `https://testnet.arcscan.app/tx/${hash}`;

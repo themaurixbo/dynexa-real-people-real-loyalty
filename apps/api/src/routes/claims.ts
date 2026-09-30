@@ -18,6 +18,7 @@ const claimBody = z.object({
   evidenceText: z.string().optional(),
   receiptRef: z.string().min(1),
   referralCode: z.string().optional(),
+  invoiceAmountBs: z.string().optional(),
 });
 
 export async function claimRoutes(app: FastifyInstance) {

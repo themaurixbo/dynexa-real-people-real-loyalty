@@ -8,6 +8,7 @@ import { adminRoutes } from "./routes/admin.js";
 import { campaignRoutes } from "./routes/campaigns.js";
 import { claimRoutes } from "./routes/claims.js";
 import { businessRoutes } from "./routes/business.js";
+import { dynexaRoutes } from "./routes/dynexa.js";
 import { giftRoutes } from "./routes/gifts.js";
 import { redeemRoutes } from "./routes/redeem.js";
 import { transferRoutes } from "./routes/transfers.js";
@@ -37,6 +38,7 @@ await app.register(businessRoutes);
 await app.register(transferRoutes);
 await app.register(adminRoutes);
 await app.register(activityRoutes);
+await app.register(dynexaRoutes);
 
 app
   .listen({ port: env.port, host: "0.0.0.0" })

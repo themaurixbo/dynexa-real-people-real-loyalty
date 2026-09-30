@@ -25,10 +25,13 @@ const createBody = z.object({
   name: z.string().min(1),
   category: z.enum(["shopping", "food", "events"]).default("shopping"),
   rewardType: z.enum(["receipt", "selfie", "referral"]).default("receipt"),
-  rewardMode: z.enum(["usdc", "gift"]).default("usdc"),
-  rewardPerUserUsdc: z.string(),
-  totalBudgetUsdc: z.string(),
-  maxPerTxUsdc: z.string(),
+  rewardMode: z.enum(["usdc", "gift", "dynexa"]).default("usdc"),
+  // usdc/gift modes
+  rewardPerUserUsdc: z.string().default("0"),
+  totalBudgetUsdc: z.string().default("0"),
+  maxPerTxUsdc: z.string().default("0"),
+  // dynexa mode only: reward = invoice total (Bs) * rewardPercentage / 100
+  rewardPercentage: z.number().positive().max(100).optional(),
   maxUsesPerHuman: z.number().int().positive().default(1),
   maxParticipants: z.number().int().positive().optional(),
   requiresApprovalAboveUsdc: z.string().optional(),
@@ -56,17 +59,29 @@ const editBody = z.object({
 export async function campaignRoutes(app: FastifyInstance) {
   app.post("/campaigns", async (req, reply) => {
     const body = createBody.parse(req.body);
-    if (!env.factoryAddress) return reply.code(500).send({ error: "FACTORY_ADDRESS not set" });
+    if (body.rewardMode === "dynexa" && !body.rewardPercentage) {
+      return reply.code(400).send({ error: "rewardPercentage is required for dynexa campaigns" });
+    }
+    if (body.rewardMode !== "dynexa" && !env.factoryAddress) {
+      return reply.code(500).send({ error: "FACTORY_ADDRESS not set" });
+    }
 
     const business = await upsertBusiness(body.businessName);
 
-    // Always deploy a treasury (holds USDC for usdc campaigns; unused for gift).
-    const { treasury, txHash } = await createCampaignOnChain({
-      factory: env.factoryAddress,
-      agent: agentSigner.address,
-      perTxLimit: usdc(body.maxPerTxUsdc),
-      campaignTotalLimit: usdc(body.totalBudgetUsdc),
-    });
+    // dynexa campaigns pay off-chain points, straight from the policy engine —
+    // no treasury to deploy, nothing to fund.
+    let treasury: string | null = null;
+    let txHash: string | undefined;
+    if (body.rewardMode !== "dynexa") {
+      const onChain = await createCampaignOnChain({
+        factory: env.factoryAddress!,
+        agent: agentSigner.address,
+        perTxLimit: usdc(body.maxPerTxUsdc),
+        campaignTotalLimit: usdc(body.totalBudgetUsdc),
+      });
+      treasury = onChain.treasury;
+      txHash = onChain.txHash;
+    }
 
     let giftCampaignId: number | null = null;
     let giftTxHash: string | undefined;
@@ -93,8 +108,9 @@ export async function campaignRoutes(app: FastifyInstance) {
         category: body.category,
         rewardType: body.rewardType,
         rewardMode: body.rewardMode,
+        rewardPercentage: body.rewardPercentage != null ? String(body.rewardPercentage) : null,
         treasuryAddress: treasury,
-        agentSignerAddress: agentSigner.address,
+        agentSignerAddress: body.rewardMode === "dynexa" ? null : agentSigner.address,
         totalBudgetUsdc: body.totalBudgetUsdc,
         rewardPerUserUsdc: body.rewardPerUserUsdc,
         maxPerTxUsdc: body.maxPerTxUsdc,
@@ -143,8 +159,11 @@ export async function campaignRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     const { paused } = z.object({ paused: z.boolean() }).parse(req.body);
     const c = await db.query.campaigns.findFirst({ where: eq(campaigns.id, id) });
-    if (!c?.treasuryAddress) return reply.code(404).send({ error: "not found" });
-    const txHash = await setTreasuryPaused(c.treasuryAddress as `0x${string}`, paused);
+    if (!c) return reply.code(404).send({ error: "not found" });
+    // dynexa campaigns have no on-chain treasury — pausing is a plain DB flag.
+    const txHash = c.treasuryAddress
+      ? await setTreasuryPaused(c.treasuryAddress as `0x${string}`, paused)
+      : undefined;
     await db
       .update(campaigns)
       .set({ status: paused ? "paused" : "active" })
@@ -155,8 +174,10 @@ export async function campaignRoutes(app: FastifyInstance) {
   app.post("/campaigns/:id/close", async (req, reply) => {
     const { id } = req.params as { id: string };
     const c = await db.query.campaigns.findFirst({ where: eq(campaigns.id, id) });
-    if (!c?.treasuryAddress) return reply.code(404).send({ error: "not found" });
-    const txHash = await closeTreasury(c.treasuryAddress as `0x${string}`);
+    if (!c) return reply.code(404).send({ error: "not found" });
+    const txHash = c.treasuryAddress
+      ? await closeTreasury(c.treasuryAddress as `0x${string}`)
+      : undefined;
     await db.update(campaigns).set({ status: "closed" }).where(eq(campaigns.id, id));
     return { txHash };
   });

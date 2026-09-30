@@ -104,7 +104,7 @@ export function BusinessApp() {
         <Approvals campaignIds={myCampaigns.map((c) => c.id)} campaigns={myCampaigns} onChange={refresh} />
       )}
       {tab === "history" && <History campaignIds={myCampaigns.map((c) => c.id)} campaigns={myCampaigns} />}
-      {tab === "pos" && <Pos />}
+      {tab === "pos" && <Pos businessId={myBusiness?.id} businessName={businessName} />}
     </div>
   );
 }
@@ -131,7 +131,7 @@ function CampaignList({ campaigns, onChange }: { campaigns: Campaign[]; onChange
                 </div>
               </div>
               <span className="num" style={{ color: "var(--cyan)", fontWeight: 700 }}>
-                {c.onchainBalance ?? "0"} USDC
+                {c.rewardMode === "dynexa" ? `${Number(c.rewardPercentage ?? 0)}%` : `${c.onchainBalance ?? "0"} USDC`}
               </span>
             </div>
             {noFunds && (
@@ -152,26 +152,35 @@ function CampaignList({ campaigns, onChange }: { campaigns: Campaign[]; onChange
               </div>
             )}
             <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 8 }}>
-              {Number(c.rewardPerUserUsdc)} / reward · max {Number(c.maxPerTxUsdc)} / tx ·{" "}
+              {c.rewardMode === "dynexa"
+                ? `${Number(c.rewardPercentage ?? 0)}% of the invoice, paid in DYNEXA points`
+                : `${Number(c.rewardPerUserUsdc)} / reward · max ${Number(c.maxPerTxUsdc)} / tx`}
+              {" · "}
               {c.maxUsesPerHuman} per person
               {c.maxParticipants ? ` · up to ${c.maxParticipants} participants` : ""}
             </div>
             <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-              <Action
-                label="Fund 5"
-                run={() => api.fund(c.id, "5")}
-                onChange={onChange}
-                steps={[
-                  { brand: "Arc", label: "Approving USDC for the campaign treasury" },
-                  { brand: "Arc", label: "Moving the funds into the treasury" },
-                  { brand: "Arc", label: "Confirming on Arc" },
-                ]}
-              />
+              {c.rewardMode !== "dynexa" && (
+                <Action
+                  label="Fund 5"
+                  run={() => api.fund(c.id, "5")}
+                  onChange={onChange}
+                  steps={[
+                    { brand: "Arc", label: "Approving USDC for the campaign treasury" },
+                    { brand: "Arc", label: "Moving the funds into the treasury" },
+                    { brand: "Arc", label: "Confirming on Arc" },
+                  ]}
+                />
+              )}
               <Action
                 label={c.status === "paused" ? "Resume" : "Pause"}
                 run={() => api.pause(c.id, c.status !== "paused")}
                 onChange={onChange}
-                steps={[{ brand: "Arc", label: "Updating the campaign on Arc" }]}
+                steps={[
+                  c.rewardMode === "dynexa"
+                    ? { brand: "DYNEXA", label: "Updating the campaign" }
+                    : { brand: "Arc", label: "Updating the campaign on Arc" },
+                ]}
               />
               <button className="btn-ghost" onClick={() => setEditing(c)}>
                 Edit
@@ -180,10 +189,14 @@ function CampaignList({ campaigns, onChange }: { campaigns: Campaign[]; onChange
                 label="Close"
                 run={() => api.close(c.id)}
                 onChange={onChange}
-                steps={[
-                  { brand: "Arc", label: "Closing the campaign" },
-                  { brand: "Arc", label: "Refunding the remaining USDC to the business" },
-                ]}
+                steps={
+                  c.rewardMode === "dynexa"
+                    ? [{ brand: "DYNEXA", label: "Closing the campaign" }]
+                    : [
+                        { brand: "Arc", label: "Closing the campaign" },
+                        { brand: "Arc", label: "Refunding the remaining USDC to the business" },
+                      ]
+                }
               />
             </div>
           </Card>
@@ -348,6 +361,8 @@ function CreateCampaign({ businessName, onCreated }: { businessName: string; onC
     category: "shopping" as (typeof CATEGORIES)[number],
     rewardType: "receipt" as "receipt" | "selfie" | "referral",
     rewardMode: "usdc" as "usdc" | "gift",
+    percentageReward: false,
+    rewardPercentage: "10",
     rewardPerUserUsdc: "5",
     totalBudgetUsdc: "100",
     maxPerTxUsdc: "5",
@@ -388,15 +403,20 @@ function CreateCampaign({ businessName, onCreated }: { businessName: string; onC
         <TrackLoader
           title="Creating the campaign"
           steps={
-            f.rewardMode === "gift"
+            f.percentageReward
               ? [
-                  { brand: "Arc", label: "Deploying the campaign treasury on Arc" },
-                  { brand: "Arc", label: "Registering the branded gift (GiftToken)" },
+                  { brand: "DYNEXA", label: "Setting up the percentage-reward rule" },
+                  { brand: "DYNEXA", label: "No treasury needed — DYNEXA points are off-chain" },
                 ]
-              : [
-                  { brand: "Arc", label: "Deploying the campaign treasury on Arc" },
-                  { brand: "Arc", label: "Setting the per-tx and total limits on-chain" },
-                ]
+              : f.rewardMode === "gift"
+                ? [
+                    { brand: "Arc", label: "Deploying the campaign treasury on Arc" },
+                    { brand: "Arc", label: "Registering the branded gift (GiftToken)" },
+                  ]
+                : [
+                    { brand: "Arc", label: "Deploying the campaign treasury on Arc" },
+                    { brand: "Arc", label: "Setting the per-tx and total limits on-chain" },
+                  ]
           }
         />
       )}
@@ -433,52 +453,108 @@ function CreateCampaign({ businessName, onCreated }: { businessName: string; onC
           </div>
         </Field>
 
-        <Field label="Reward">
-          <div className="mode-switch">
-            {(["usdc", "gift"] as const).map((m) => (
-              <button
-                key={m}
-                className={`mode-tab ${f.rewardMode === m ? "active" : ""}`}
-                onClick={() => set("rewardMode", m)}
-              >
-                {m === "usdc" ? "USDC" : "GiftToken"}
-              </button>
-            ))}
-          </div>
-        </Field>
-        <Row>
-          <Field label="Reward per user (USDC)">
-            <input
-              className="field"
-              value={f.rewardPerUserUsdc}
-              onChange={(e) => set("rewardPerUserUsdc", e.target.value)}
-            />
+        {!f.percentageReward && (
+          <Field label="Reward">
+            <div className="mode-switch">
+              {(["usdc", "gift"] as const).map((m) => (
+                <button
+                  key={m}
+                  className={`mode-tab ${f.rewardMode === m ? "active" : ""}`}
+                  onClick={() => set("rewardMode", m)}
+                >
+                  {m === "usdc" ? "USDC" : "GiftToken"}
+                </button>
+              ))}
+            </div>
           </Field>
-          <Field label="Total budget (USDC)">
-            <input
-              className="field"
-              value={f.totalBudgetUsdc}
-              onChange={(e) => set("totalBudgetUsdc", e.target.value)}
-            />
-          </Field>
-        </Row>
-        <Row>
-          <Field label="Max per transaction">
-            <input
-              className="field"
-              value={f.maxPerTxUsdc}
-              onChange={(e) => set("maxPerTxUsdc", e.target.value)}
-            />
-          </Field>
-          <Field label="Max per person">
-            <input
-              className="field"
-              type="number"
-              value={f.maxUsesPerHuman}
-              onChange={(e) => set("maxUsesPerHuman", Number(e.target.value))}
-            />
-          </Field>
-        </Row>
+        )}
+
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 13,
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 10,
+            padding: "10px 12px",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={f.percentageReward}
+            onChange={(e) => set("percentageReward", e.target.checked)}
+          />
+          Recompensa porcentual — paga un % de la factura en DYNEXA en vez de un monto fijo
+        </label>
+
+        {f.percentageReward ? (
+          <Row>
+            <Field label="Porcentaje de la factura que se premia">
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  className="field"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="0.5"
+                  value={f.rewardPercentage}
+                  onChange={(e) => set("rewardPercentage", e.target.value)}
+                  style={{ maxWidth: 100 }}
+                />
+                <span style={{ color: "var(--muted)", fontSize: 12 }}>
+                  % — ej. 112 Bs al {f.rewardPercentage || 0}% da{" "}
+                  {(112 * (Number(f.rewardPercentage) || 0)) / 100} DYNEXA
+                </span>
+              </div>
+            </Field>
+            <Field label="Max per person">
+              <input
+                className="field"
+                type="number"
+                value={f.maxUsesPerHuman}
+                onChange={(e) => set("maxUsesPerHuman", Number(e.target.value))}
+              />
+            </Field>
+          </Row>
+        ) : (
+          <>
+            <Row>
+              <Field label="Reward per user (USDC)">
+                <input
+                  className="field"
+                  value={f.rewardPerUserUsdc}
+                  onChange={(e) => set("rewardPerUserUsdc", e.target.value)}
+                />
+              </Field>
+              <Field label="Total budget (USDC)">
+                <input
+                  className="field"
+                  value={f.totalBudgetUsdc}
+                  onChange={(e) => set("totalBudgetUsdc", e.target.value)}
+                />
+              </Field>
+            </Row>
+            <Row>
+              <Field label="Max per transaction">
+                <input
+                  className="field"
+                  value={f.maxPerTxUsdc}
+                  onChange={(e) => set("maxPerTxUsdc", e.target.value)}
+                />
+              </Field>
+              <Field label="Max per person">
+                <input
+                  className="field"
+                  type="number"
+                  value={f.maxUsesPerHuman}
+                  onChange={(e) => set("maxUsesPerHuman", Number(e.target.value))}
+                />
+              </Field>
+            </Row>
+          </>
+        )}
         <Row>
           <Field label="Max participants (optional)">
             <input
@@ -510,7 +586,7 @@ function CreateCampaign({ businessName, onCreated }: { businessName: string; onC
             <input className="field" type="datetime-local" onChange={(e) => set("endsAt", e.target.value)} />
           </Field>
         </Row>
-        {f.rewardMode === "gift" && (
+        {!f.percentageReward && f.rewardMode === "gift" && (
           <>
             <Field label="GiftToken name">
               <input className="field" value={f.giftName} onChange={(e) => set("giftName", e.target.value)} />
@@ -571,6 +647,8 @@ function CreateCampaign({ businessName, onCreated }: { businessName: string; onC
               await api.createCampaign({
                 ...f,
                 businessName,
+                rewardMode: f.percentageReward ? "dynexa" : f.rewardMode,
+                rewardPercentage: f.percentageReward ? Number(f.rewardPercentage) : undefined,
                 maxParticipants: f.maxParticipants ? Number(f.maxParticipants) : undefined,
                 requiresApprovalAboveUsdc: f.requiresApprovalAboveUsdc || undefined,
                 startsAt: f.startsAt ? new Date(f.startsAt).toISOString() : undefined,
@@ -715,13 +793,36 @@ function History({ campaignIds, campaigns }: { campaignIds: string[]; campaigns:
   );
 }
 
-function Pos() {
+function Pos({ businessId, businessName }: { businessId?: string; businessName: string }) {
+  const [mode, setMode] = useState<"redeem" | "charge">("redeem");
+  return (
+    <Card style={{ maxWidth: 420 }}>
+      <div className="mode-switch" style={{ marginBottom: 14 }}>
+        <button
+          className={`mode-tab ${mode === "redeem" ? "active" : ""}`}
+          onClick={() => setMode("redeem")}
+        >
+          Redeem GiftToken
+        </button>
+        <button
+          className={`mode-tab ${mode === "charge" ? "active" : ""}`}
+          onClick={() => setMode("charge")}
+        >
+          Cobrar
+        </button>
+      </div>
+      {mode === "redeem" ? <PosRedeem /> : <PosCharge businessId={businessId} businessName={businessName} />}
+    </Card>
+  );
+}
+
+function PosRedeem() {
   const [code, setCode] = useState("");
   const [res, setRes] = useState<{ status: string; reason?: string; txHash?: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
   return (
-    <Card style={{ maxWidth: 420 }}>
+    <>
       {busy && (
         <TrackLoader
           title="Redeeming the GiftToken"
@@ -769,7 +870,111 @@ function Pos() {
           <TxLink hash={res.txHash} />
         </div>
       )}
-    </Card>
+    </>
+  );
+}
+
+/** POS "Cobrar": pick an amount in DYNEXA, get a one-time QR the customer scans and pays. */
+function PosCharge({ businessId, businessName }: { businessId?: string; businessName: string }) {
+  const [amount, setAmount] = useState("10");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [charge, setCharge] = useState<{ code: string; amountDynexa: string } | null>(null);
+  const [status, setStatus] = useState<"pending" | "paid">("pending");
+
+  useEffect(() => {
+    if (!charge || status === "paid") return;
+    const t = setInterval(async () => {
+      try {
+        const r = await api.getDynexaCharge(charge.code);
+        if (r.status === "paid") setStatus("paid");
+      } catch {
+        // keep polling
+      }
+    }, 2000);
+    return () => clearInterval(t);
+  }, [charge, status]);
+
+  async function generate() {
+    if (!businessId) {
+      setError("Save a business name first (top of the dashboard).");
+      return;
+    }
+    setError(null);
+    setBusy(true);
+    try {
+      const r = await api.createDynexaCharge(businessId, amount);
+      setCharge({ code: r.code, amountDynexa: r.amountDynexa });
+      setStatus("pending");
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (charge) {
+    const qrPayload =
+      typeof window !== "undefined" ? `${window.location.origin}/?dynexa-charge=${charge.code}` : charge.code;
+    return (
+      <div style={{ textAlign: "center" }}>
+        <div className="label" style={{ marginBottom: 10 }}>
+          Cobrando {Number(charge.amountDynexa)} DYNEXA — {businessName}
+        </div>
+        {status === "paid" ? (
+          <>
+            <div style={{ fontSize: 32 }}>✅</div>
+            <div style={{ fontWeight: 700, margin: "6px 0" }}>Cobrado</div>
+            <p style={{ fontSize: 13, color: "var(--muted)" }}>
+              {Number(charge.amountDynexa)} DYNEXA recibidos.
+            </p>
+          </>
+        ) : (
+          <>
+            <img
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrPayload)}`}
+              alt="QR de cobro"
+              style={{ borderRadius: 12, background: "#fff", padding: 8 }}
+            />
+            <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 10 }}>
+              Esperando a que el cliente escanee y confirme…
+            </p>
+          </>
+        )}
+        <button
+          className="btn-ghost"
+          style={{ width: "100%", marginTop: 14 }}
+          onClick={() => {
+            setCharge(null);
+            setStatus("pending");
+          }}
+        >
+          {status === "paid" ? "Nuevo cobro" : "Cancelar"}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {busy && <TrackLoader steps={[{ brand: "DYNEXA", label: "Generando el código de cobro" }]} />}
+      <div className="label" style={{ marginBottom: 6 }}>
+        Cobrar en DYNEXA
+      </div>
+      <input
+        className="field"
+        type="number"
+        min={0}
+        step="0.5"
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        placeholder="Monto en DYNEXA"
+      />
+      {error && <p style={{ color: "#ff8a8a", fontSize: 12, marginTop: 8 }}>{error}</p>}
+      <button className="btn-primary" style={{ marginTop: 12 }} disabled={busy || !amount} onClick={generate}>
+        {busy ? "Generando…" : "Generar QR de cobro"}
+      </button>
+    </>
   );
 }
 

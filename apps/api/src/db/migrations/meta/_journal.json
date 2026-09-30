@@ -50,6 +50,13 @@
       "when": 1789101448479,
       "tag": "0006_married_miracleman",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790773667545,
+      "tag": "0007_lonely_talon",
+      "breakpoints": true
     }
   ]
 }

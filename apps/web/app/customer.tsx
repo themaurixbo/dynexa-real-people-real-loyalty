@@ -8,6 +8,7 @@ import { fileToDataUrl } from "../lib/image";
 import { BrandMark, Card, ErrorNote, Logo, Partner, TxLink, WalletCard } from "./ui";
 import { TrackLoader } from "./loader";
 import { ClaimGiftCard, ClaimGiftTokenCard, GiftShareModal, ReferralModal, SendModal } from "./send";
+import { DynexaPayModal, PayIcon } from "./dynexa";
 import { WorldVerify, useWorldStatus } from "./world";
 
 type Gift = {
@@ -45,6 +46,10 @@ function activityIcon(type: ActivityItem["type"]): string {
       return "📤";
     case "gift_received":
       return "📥";
+    case "dynexa_won":
+      return "⭐";
+    case "dynexa_spent":
+      return "💳";
   }
 }
 
@@ -63,6 +68,7 @@ export function CustomerApp() {
   );
   const [giftCode, setGiftCode] = useState<string | null>(null);
   const [giftTokenCode, setGiftTokenCode] = useState<string | null>(null);
+  const [dynexaChargeCode, setDynexaChargeCode] = useState<string | null>(null);
   const [referralCode, setReferralCode] = useState<string | null>(null);
   const [referralCampaignId, setReferralCampaignId] = useState<string | null>(null);
 
@@ -70,9 +76,11 @@ export function CustomerApp() {
     const params = new URLSearchParams(window.location.search);
     const gift = params.get("gift");
     const giftToken = params.get("gift-token");
+    const dynexaCharge = params.get("dynexa-charge");
     const ref = params.get("ref");
     if (gift) setGiftCode(gift.toUpperCase());
     if (giftToken) setGiftTokenCode(giftToken.toUpperCase());
+    if (dynexaCharge) setDynexaChargeCode(dynexaCharge.toUpperCase());
     if (ref) {
       const code = ref.toUpperCase();
       setReferralCode(code);
@@ -161,6 +169,11 @@ export function CustomerApp() {
         setGiftTokenCode(null);
         clearParam("gift-token");
       }}
+      dynexaChargeCode={dynexaChargeCode}
+      onDynexaChargeHandled={() => {
+        setDynexaChargeCode(null);
+        clearParam("dynexa-charge");
+      }}
       referralCode={referralCode}
       referralCampaignId={referralCampaignId}
     />
@@ -174,6 +187,8 @@ function Home({
   onGiftHandled,
   giftTokenCode,
   onGiftTokenHandled,
+  dynexaChargeCode,
+  onDynexaChargeHandled,
   referralCode,
   referralCampaignId,
 }: {
@@ -183,12 +198,16 @@ function Home({
   onGiftHandled?: () => void;
   giftTokenCode?: string | null;
   onGiftTokenHandled?: () => void;
+  dynexaChargeCode?: string | null;
+  onDynexaChargeHandled?: () => void;
   referralCode?: string | null;
   referralCampaignId?: string | null;
 }) {
   const [tab, setTab] = useState<"home" | "wallet" | "gifts" | "profile">("home");
   const { verified, setVerified } = useWorldStatus(wallet);
   const [balance, setBalance] = useState<string | null>(null);
+  const [dynexaBalance, setDynexaBalance] = useState<string | null>(null);
+  const [paying, setPaying] = useState(false);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [category, setCategory] = useState<Category>("all");
   const [gifts, setGifts] = useState<Gift[]>([]);
@@ -202,6 +221,7 @@ function Home({
   const load = useCallback(() => {
     if (!wallet) return;
     usdcBalance(wallet).then(setBalance);
+    api.dynexaBalance(wallet).then((r) => setDynexaBalance(r.balance)).catch(() => {});
     api.gifts(wallet).then(setGifts).catch(() => {});
     api.activity(wallet).then(setActivity).catch(() => {});
     api
@@ -335,27 +355,52 @@ function Home({
               <Partner name="Privy" />
             </div>
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginTop: 16 }}>
-              <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
-                <span className="num" style={{ fontSize: 40, fontWeight: 800, color: "var(--gold)" }}>
-                  {balance ?? "—"}
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
+                  <span className="num" style={{ fontSize: 40, fontWeight: 800, color: "var(--gold)" }}>
+                    {balance ?? "—"}
+                  </span>
+                  <span className="num" style={{ fontSize: 15, fontWeight: 600, color: "var(--muted)" }}>
+                    USDC
+                  </span>
                 </span>
-                <span className="num" style={{ fontSize: 15, fontWeight: 600, color: "var(--muted)" }}>
-                  USDC
+                <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
+                  <span className="num" style={{ fontSize: 18, fontWeight: 700, color: "var(--cyan)" }}>
+                    {dynexaBalance != null ? Number(dynexaBalance) : "—"}
+                  </span>
+                  <span className="num" style={{ fontSize: 12, fontWeight: 600, color: "var(--muted)" }}>
+                    DYNEXA
+                  </span>
                 </span>
-              </span>
+              </div>
               {wallet && (
-                <button
-                  className="btn-ghost"
-                  style={{
-                    fontSize: 12,
-                    padding: "8px 12px",
-                    background: "rgba(224,184,110,0.1)",
-                    borderColor: "rgba(224,184,110,0.35)",
-                  }}
-                  onClick={() => setSending(true)}
-                >
-                  Send to a friend
-                </button>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "flex-end" }}>
+                  <button
+                    className="btn-primary"
+                    style={{
+                      fontSize: 12,
+                      padding: "8px 14px",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                    }}
+                    onClick={() => setPaying(true)}
+                  >
+                    <PayIcon size={14} /> PAGAR
+                  </button>
+                  <button
+                    className="btn-ghost"
+                    style={{
+                      fontSize: 12,
+                      padding: "8px 12px",
+                      background: "rgba(224,184,110,0.1)",
+                      borderColor: "rgba(224,184,110,0.35)",
+                    }}
+                    onClick={() => setSending(true)}
+                  >
+                    Send to a friend
+                  </button>
+                </div>
               )}
             </div>
             <div
@@ -382,6 +427,20 @@ function Home({
 
       {sending && wallet && (
         <SendModal wallet={wallet} contact={contact} onClose={() => setSending(false)} />
+      )}
+
+      {(paying || dynexaChargeCode) && wallet && (
+        <DynexaPayModal
+          wallet={wallet}
+          contact={contact}
+          initialCode={dynexaChargeCode}
+          onPaid={load}
+          onClose={() => {
+            setPaying(false);
+            setTab("wallet");
+            if (dynexaChargeCode) onDynexaChargeHandled?.();
+          }}
+        />
       )}
 
       {(tab === "home" || tab === "gifts" || tab === "wallet") && (
@@ -428,11 +487,15 @@ function Home({
               <Card key={c.id}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
                   <div style={{ fontWeight: 700, fontSize: 15 }}>{c.name}</div>
-                  <Partner name="Arc" />
+                  <Partner name={c.rewardMode === "dynexa" ? "DYNEXA" : "Arc"} />
                 </div>
                 <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 2 }}>
-                  {c.rewardMode === "usdc" ? `${Number(c.rewardPerUserUsdc)} USDC` : "A branded GiftToken"} ·
-                  up to {c.maxUsesPerHuman} per person
+                  {c.rewardMode === "dynexa"
+                    ? `${Number(c.rewardPercentage ?? 0)}% back in DYNEXA`
+                    : c.rewardMode === "usdc"
+                      ? `${Number(c.rewardPerUserUsdc)} USDC`
+                      : "A branded GiftToken"}{" "}
+                  · up to {c.maxUsesPerHuman} per person
                   {c.rewardType === "selfie" ? " · selfie required" : ""}
                   {c.rewardType === "referral" ? " · refer a friend" : ""}
                 </div>
@@ -820,10 +883,12 @@ function ClaimModal({
   onClose: () => void;
 }) {
   const isSelfie = campaign.rewardType === "selfie";
+  const isPercentage = campaign.rewardMode === "dynexa";
   const [photo, setPhoto] = useState<string | null>(null);
   const [socialLink, setSocialLink] = useState("");
   const [useLink, setUseLink] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [invoiceAmountBs, setInvoiceAmountBs] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ClaimResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -846,6 +911,10 @@ function ClaimModal({
       setError(useLink ? "Paste a link to your post first." : "Add a photo first.");
       return;
     }
+    if (isPercentage && !invoiceAmountBs.trim()) {
+      setError("Enter the invoice total first.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -857,6 +926,7 @@ function ClaimModal({
           evidenceUrl,
           receiptRef: `${contact}-${Date.now()}`,
           referralCode,
+          invoiceAmountBs: isPercentage ? invoiceAmountBs.trim() : undefined,
         }),
       );
     } catch (e) {
@@ -866,8 +936,13 @@ function ClaimModal({
     }
   }
 
-  const claimSteps =
-    campaign.rewardMode === "gift"
+  const claimSteps = isPercentage
+    ? [
+        { brand: "World" as const, label: "Checking you are a real, unique person" },
+        { brand: "DYNEXA" as const, label: "The agent reviews your proof" },
+        { brand: "DYNEXA" as const, label: "Crediting your DYNEXA points — no blockchain needed" },
+      ]
+    : campaign.rewardMode === "gift"
       ? [
           { brand: "World" as const, label: "Checking you are a real, unique person" },
           { brand: "DYNEXA" as const, label: "The agent reviews your proof" },
@@ -985,11 +1060,31 @@ function ClaimModal({
                 </label>
               )}
               {photoError && <p style={{ color: "#ff8a8a", fontSize: 12, marginTop: 6 }}>{photoError}</p>}
+
+              {isPercentage && (
+                <div style={{ marginTop: 12 }}>
+                  <div className="label" style={{ marginBottom: 6 }}>
+                    Invoice total (Bs)
+                  </div>
+                  <input
+                    className="field"
+                    inputMode="decimal"
+                    value={invoiceAmountBs}
+                    onChange={(e) => setInvoiceAmountBs(e.target.value)}
+                    placeholder="e.g. 112"
+                  />
+                  <p style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 6 }}>
+                    You earn {Number(campaign.rewardPercentage ?? 0)}% of this in DYNEXA — e.g.{" "}
+                    {(Number(invoiceAmountBs) || 0) * (Number(campaign.rewardPercentage ?? 0) / 100)} DYNEXA.
+                  </p>
+                </div>
+              )}
+
               {error && <ErrorNote message={error} />}
               <button
                 className="btn-primary"
                 style={{ marginTop: 14 }}
-                disabled={busy || (!photo && !socialLink.trim())}
+                disabled={busy || (!photo && !socialLink.trim()) || (isPercentage && !invoiceAmountBs.trim())}
                 onClick={submit}
               >
                 {busy ? "Working…" : "Submit claim"}
@@ -1013,9 +1108,11 @@ function ResultView({ result, onClose }: { result: ClaimResult; onClose: () => v
       </div>
       <div style={{ fontWeight: 700, fontSize: 16, margin: "6px 0" }}>
         {good
-          ? result.amountUsdc
-            ? `You received ${result.amountUsdc} USDC`
-            : "Your GiftToken is on the way"
+          ? result.dynexaAmount
+            ? `You earned ${Number(result.dynexaAmount)} DYNEXA`
+            : result.amountUsdc
+              ? `You received ${result.amountUsdc} USDC`
+              : "Your GiftToken is on the way"
           : result.status === "rejected"
             ? "Not approved this time"
             : "Waiting for business approval"}
