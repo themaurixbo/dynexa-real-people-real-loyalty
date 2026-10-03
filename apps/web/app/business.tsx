@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, type Campaign, type Claim } from "../lib/api";
 import { fileToDataUrl } from "../lib/image";
-import { Card, TxLink } from "./ui";
+import { Card, Logo, TxLink } from "./ui";
 import { TrackLoader, type TrackStep } from "./loader";
 
 const CATEGORIES = ["shopping", "food", "events"] as const;
@@ -931,11 +931,44 @@ function PosCharge({ businessId, businessName }: { businessId?: string; business
           </>
         ) : (
           <>
-            <img
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrPayload)}`}
-              alt="QR de cobro"
-              style={{ borderRadius: 12, background: "#fff", padding: 8 }}
-            />
+            <div
+              style={{
+                position: "relative",
+                display: "inline-block",
+                borderRadius: 12,
+                background: "#fff",
+                padding: 8,
+                lineHeight: 0,
+              }}
+            >
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=0&ecc=H&data=${encodeURIComponent(qrPayload)}`}
+                alt="QR de cobro"
+                width={220}
+                height={220}
+                style={{ display: "block" }}
+              />
+              <div
+                style={{
+                  position: "absolute",
+                  top: "50%",
+                  left: "50%",
+                  transform: "translate(-50%, -50%)",
+                  width: 52,
+                  height: 52,
+                  borderRadius: "50%",
+                  background: "#fff",
+                  border: "3px solid #fff",
+                  boxShadow: "0 0 0 1px rgba(0,0,0,0.08)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  overflow: "hidden",
+                }}
+              >
+                <Logo size={40} />
+              </div>
+            </div>
             <p style={{ fontSize: 12, color: "var(--muted)", marginTop: 10 }}>
               Esperando a que el cliente escanee y confirme…
             </p>
