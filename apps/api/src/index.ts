@@ -1,5 +1,6 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
+import { ZodError } from "zod";
 import { env } from "./lib/env.js";
 import { transferEscrow } from "./lib/chain.js";
 import { agentSigner } from "./agent/signer.js";
@@ -19,6 +20,15 @@ import { worldRoutes } from "./routes/world.js";
 const app = Fastify({ logger: true, bodyLimit: 10 * 1024 * 1024 });
 
 await app.register(cors, { origin: true });
+
+// Bad input is the caller's mistake (400), not a server fault (500).
+app.setErrorHandler((err, _req, reply) => {
+  if (err instanceof ZodError) {
+    const error = err.issues.map((i) => `${i.path.join(".") || "body"}: ${i.message}`).join("; ");
+    return reply.code(400).send({ error });
+  }
+  return reply.send(err);
+});
 
 app.get("/health", async () => ({
   ok: true,

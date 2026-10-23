@@ -18,7 +18,11 @@ const claimBody = z.object({
   evidenceText: z.string().optional(),
   receiptRef: z.string().min(1),
   referralCode: z.string().optional(),
-  invoiceAmountBs: z.string().optional(),
+  invoiceAmountBs: z
+    .string()
+    .regex(/^\d{1,7}(\.\d{1,2})?$/, "Invoice total must be a number like 112 or 112.50")
+    .refine((v) => Number(v) > 0, "Invoice total must be above 0")
+    .optional(),
 });
 
 export async function claimRoutes(app: FastifyInstance) {

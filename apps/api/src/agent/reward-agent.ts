@@ -117,6 +117,7 @@ export async function runRewardClaim(reqBody: ClaimRequest): Promise<ClaimResult
     qualifyCondition: campaign.qualifyCondition ?? "",
     rewardType: campaign.rewardType,
     referenceImages: campaign.referenceImages ?? undefined,
+    declaredAmountBs: campaign.rewardMode === "dynexa" ? reqBody.invoiceAmountBs : undefined,
   });
 
   const amount = usdc(campaign.rewardPerUserUsdc ?? "0");

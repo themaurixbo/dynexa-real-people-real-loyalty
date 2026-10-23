@@ -21,6 +21,9 @@ export interface VerdictInput {
   qualifyCondition: string;
   rewardType?: "receipt" | "selfie" | "referral";
   referenceImages?: string[];
+  // Percentage campaigns: the total the customer typed in. The AI can only veto
+  // a mismatch — it never sets or changes the amount.
+  declaredAmountBs?: string;
 }
 
 export interface Verdict {
@@ -86,8 +89,13 @@ async function visionCheck(input: VerdictInput): Promise<Omit<Verdict, "paymentT
         "holding or using the product, with the product or brand logo readable. Selfies are taken " +
         "with a front camera, so any text or logo may appear mirrored — account for that."
       : "You verify a purchase receipt for a loyalty campaign: it must show the qualifying purchase.";
+  const amountCheck = input.declaredAmountBs
+    ? `The customer declares the invoice total is ${input.declaredAmountBs} Bs. If the total ` +
+      `visible on the receipt is clearly different (more than a few Bs), answer valid=false and ` +
+      `state the total you actually see. `
+    : "";
   const prompt =
-    `${task} Condition: "${input.qualifyCondition}". ` +
+    `${task} Condition: "${input.qualifyCondition}". ${amountCheck}` +
     (input.referenceImages?.length
       ? "The next image(s) after the proof are reference photos of the real product/brand — use them " +
         "as visual context, they are not the proof itself. "
