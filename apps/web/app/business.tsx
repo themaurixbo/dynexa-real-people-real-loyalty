@@ -120,7 +120,8 @@ function CampaignList({ campaigns, onChange }: { campaigns: Campaign[]; onChange
         const noFunds =
           c.rewardMode === "usdc" &&
           c.status === "active" &&
-          Number(c.onchainBalance ?? 0) < Number(c.rewardPerUserUsdc);
+          c.onchainBalance !== undefined &&
+          Number(c.onchainBalance) < Number(c.rewardPerUserUsdc);
         return (
           <Card key={c.id}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
@@ -131,7 +132,7 @@ function CampaignList({ campaigns, onChange }: { campaigns: Campaign[]; onChange
                 </div>
               </div>
               <span className="num" style={{ color: "var(--cyan)", fontWeight: 700 }}>
-                {c.rewardMode === "dynexa" ? `${Number(c.rewardPercentage ?? 0)}%` : `${c.onchainBalance ?? "0"} USDC`}
+                {c.rewardMode === "dynexa" ? `${Number(c.rewardPercentage ?? 0)}%` : `${c.onchainBalance ?? "—"} USDC`}
               </span>
             </div>
             {noFunds && (

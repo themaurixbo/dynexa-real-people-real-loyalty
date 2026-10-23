@@ -252,8 +252,12 @@ async function upsertBusiness(name: string) {
 }
 
 async function withBalance(c: typeof schema.campaigns.$inferSelect) {
-  const onchainBalance = c.treasuryAddress
-    ? fromUsdc(await treasuryBalance(c.treasuryAddress as `0x${string}`))
-    : "0";
-  return { ...c, onchainBalance };
+  if (!c.treasuryAddress) return { ...c, onchainBalance: "0" };
+  // One flaky RPC call must not take the whole campaign list down.
+  try {
+    const onchainBalance = fromUsdc(await treasuryBalance(c.treasuryAddress as `0x${string}`));
+    return { ...c, onchainBalance };
+  } catch {
+    return { ...c, onchainBalance: undefined };
+  }
 }

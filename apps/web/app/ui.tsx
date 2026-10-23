@@ -109,7 +109,7 @@ export function TxLink({ hash }: { hash?: string }) {
   if (!hash || !hash.startsWith("0x")) return null;
   return (
     <a
-      href={`https://testnet.arcscan.app/tx/${hash}`}
+      href={`https://explorer.testnet.arc.io/tx/${hash}`}
       target="_blank"
       rel="noreferrer"
       className="num"

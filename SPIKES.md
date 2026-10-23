@@ -10,8 +10,8 @@ Source: Circle's `circlefin/skills` repo (`plugins/circle/skills/use-arc`).
 | Item | Value |
 |---|---|
 | Chain ID | 5042002 (0x4CEF52) |
-| RPC | https://rpc.testnet.arc.network |
-| Explorer | https://testnet.arcscan.app |
+| RPC | https://rpc.testnet.arc.io |
+| Explorer | https://explorer.testnet.arc.io |
 | USDC | `0x3600000000000000000000000000000000000000` |
 | Faucet | https://faucet.circle.com |
 

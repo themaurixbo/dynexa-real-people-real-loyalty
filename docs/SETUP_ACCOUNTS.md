@@ -19,8 +19,8 @@ local `.env` (never commit it).
    `PRIVY_AUTHORIZATION_KEY`. This key is what signs the agent payout and what
    the spending **policy** is attached to (per-tx cap = 5 USDC → our Use Case 6).
 6. Arc: add it as a custom chain in **Configuration → Chains** (id `5042002`,
-   RPC `https://rpc.testnet.arc.network`, symbol `USDC`, explorer
-   `https://testnet.arcscan.app`) so Privy allows wallet actions on it. The app
+   RPC `https://rpc.testnet.arc.io`, symbol `USDC`, explorer
+   `https://explorer.testnet.arc.io`) so Privy allows wallet actions on it. The app
    side also defines it in `packages/config/src/arc.ts`.
 
 ## Arc

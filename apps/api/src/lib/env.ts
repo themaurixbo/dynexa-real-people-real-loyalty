@@ -16,7 +16,7 @@ function req(name: string): string {
 export const env = {
   port: Number(process.env.API_PORT ?? 4000),
   databaseUrl: req("DATABASE_URL"),
-  arcRpcUrl: process.env.ARC_RPC_URL ?? "https://rpc.testnet.arc.network",
+  arcRpcUrl: process.env.ARC_RPC_URL ?? "https://rpc.testnet.arc.io",
   arcChainId: Number(process.env.ARC_CHAIN_ID ?? 5042002),
   arcUsdc: (process.env.ARC_USDC_ADDRESS ??
     "0x3600000000000000000000000000000000000000") as `0x${string}`,

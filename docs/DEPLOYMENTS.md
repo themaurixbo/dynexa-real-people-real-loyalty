@@ -2,7 +2,7 @@
 
 ## Arc testnet (chain 5042002)
 
-Explorer: https://testnet.arcscan.app
+Explorer: https://explorer.testnet.arc.io
 
 | Contract | Address |
 |---|---|

@@ -248,4 +248,4 @@ export const api = {
     }),
 };
 
-export const explorerTx = (hash: string) => `https://testnet.arcscan.app/tx/${hash}`;
+export const explorerTx = (hash: string) => `https://explorer.testnet.arc.io/tx/${hash}`;
